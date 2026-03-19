@@ -618,41 +618,8 @@ async function checkApi(){
 }
 
 /* Worker URL management */
-function saveWorkerUrl(){
-  const v=document.getElementById('workerUrl').value.trim();
-  workerUrl=v;
-  if(v)localStorage.setItem('bnb_worker_url',v);
-  else localStorage.removeItem('bnb_worker_url');
-}
 
-async function testAndSaveWorker(){
-  const inp=document.getElementById('workerUrl');
-  const res=document.getElementById('workerTestResult');
-  workerUrl=inp.value.trim();
-  localStorage.setItem('bnb_worker_url',workerUrl);
-  res.textContent='Teste…';
-  document.getElementById('dsSelect').dispatchEvent(new Event('change'));
-  await checkApi();
-  const dot=document.getElementById('apiDot');
-  if(dot.className.includes('ok')){
-    inp.className='saved';res.innerHTML='<span style="color:var(--green);font-weight:600">✓ Worker funktioniert — Verbindung erfolgreich!</span>';
-    setTimeout(()=>inp.className='',2000);
-  }else{
-    res.innerHTML='<span style="color:var(--red)">✗ Verbindung fehlgeschlagen. Worker-URL prüfen.</span>';
-  }
-}
 
-function toggleCF(){
-  const b=document.getElementById('cfBody'),c=document.getElementById('cfChevron');
-  b.classList.toggle('open');c.classList.toggle('open');
-}
-
-function copyWorkerCode(btn){
-  navigator.clipboard.writeText(WORKER_CODE).then(()=>{
-    btn.textContent='✓ Kopiert!';btn.classList.add('copied');
-    setTimeout(()=>{btn.textContent='Kopieren';btn.classList.remove('copied');},2000);
-  });
-}
 
 /* ======================================================
    ADD FROM ÖKOBAUDAT MODAL
@@ -851,12 +818,6 @@ function getName(obj){if(!obj)return'';if(typeof obj==='string')return obj;const
 
 /* INIT */
 document.getElementById('dsSelect').addEventListener('change',checkApi);
-
-// Restore saved worker URL
-if(workerUrl){
-  document.getElementById('workerUrl').value=workerUrl;
-  // Auto-expand setup section if worker is configured
-}
 
 ['ngfa','dt','bauteilName'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',render);});
 checkApi();
