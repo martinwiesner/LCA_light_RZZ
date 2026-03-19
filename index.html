@@ -342,7 +342,7 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
         <!-- Worker URL input -->
         <div class="worker-url-row">
           <label>Meine Worker-URL:</label>
-          <input type="text" id="workerUrl" placeholder="https://oebd-proxy.martin-wiesner.workers.dev/" oninput="saveWorkerUrl()">
+          <input type="text" id="workerUrl" placeholder="https://oebd-proxy.deinname.workers.dev" oninput="saveWorkerUrl()">
           <button class="btn-save-worker" onclick="testAndSaveWorker()">Speichern &amp; testen</button>
         </div>
         <div id="workerTestResult" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
@@ -506,7 +506,7 @@ function corsHeaders() {
    CONFIG
    ====================================================== */
 const BASE = 'https://oekobaudat.de/OEKOBAU.DAT/resource';
-let workerUrl = localStorage.getItem('bnb_worker_url') || '';
+let workerUrl = localStorage.getItem('bnb_worker_url') || 'https://oebd-proxy.martin-wiesner.workers.dev';
 let activeLayerId = null;
 let uid = 10;
 let chartAbs = null, chartSpec = null;
