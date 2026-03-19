@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BNB Ökobilanzrechner 2015 · mit Ökobaudat API</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0ede8; --surface: #fff; --border: #d0cdc6; --border-dark: #a8a59e;
+  --text: #18170f; --muted: #6b6860; --accent: #0c3d3d; --accent2: #155050;
+  --blue: #1a4a88; --blue-bg: #eef4fc; --blue-light: #dceeff;
+  --purple: #5a3a88; --purple-bg: #f4eeff;
+  --brown: #7a3a18; --brown-bg: #fff3ec;
+  --amber: #a86000; --amber-bg: #fff8e8;
+  --red: #8b2020;
+  --green: #185a28; --green-bg: #edfaf2; --green-border: #a0ddb5;
+  --mono: 'Courier New', Consolas, monospace;
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; background: var(--bg); color: var(--text); }
+
+header { background: var(--accent); color: white; padding: 13px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+header h1 { font-size: 15px; font-weight: 600; }
+header p { font-size: 11px; opacity: 0.6; margin-top: 3px; }
+.hdr-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.badge { font-size: 10px; font-family: var(--mono); font-weight: 700; padding: 4px 10px; border-radius: 4px; white-space: nowrap; }
+.badge-api { background: #27ae75; color: #fff; }
+.badge-gh { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+.badge-gh:hover { background: rgba(255,255,255,0.25); }
+
+.main { padding: 14px 18px; max-width: 1600px; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 14px; }
+.panel-header { background: #f6f4f0; border-bottom: 1px solid var(--border); padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
+.panel-header .note { font-weight: 400; }
+
+.building-row { display: flex; gap: 20px; padding: 11px 14px; align-items: center; flex-wrap: wrap; }
+.info-field { display: flex; align-items: center; gap: 7px; }
+.info-field label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.info-field input[type="number"], .info-field input[type="text"] { font-family: var(--mono); font-size: 13px; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; background: var(--bg); color: var(--text); text-align: right; width: 80px; }
+.info-field input[type="text"] { text-align: left; font-family: inherit; width: 140px; }
+.info-field input:focus { outline: none; border-color: var(--accent); background: white; }
+.unit { font-size: 11px; color: var(--muted); }
+
+/* API bar */
+.api-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--green-bg); font-size: 11px; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; flex-shrink: 0; transition: background 0.3s; }
+.dot.ok { background: #27ae75; } .dot.err { background: #e05c5c; } .dot.loading { background: #f0b429; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+.api-lbl { color: var(--green); font-weight: 600; }
+.api-detail { color: var(--muted); flex: 1; min-width: 0; }
+.proxy-badge { font-size: 10px; background: var(--amber-bg); border: 1px solid #e8c070; border-radius: 3px; padding: 2px 8px; color: var(--amber); white-space: nowrap; }
+.cors-hint { font-size: 10px; background: #fff3e8; border: 1px solid #e8c070; border-radius: 4px; padding: 7px 12px; color: var(--amber); margin: 6px 14px 6px; line-height: 1.6; }
+.cors-hint strong { color: var(--brown); }
+select.sel { font-size: 11px; border: 1px solid var(--border); border-radius: 3px; padding: 3px 6px; background: white; color: var(--text); cursor: pointer; }
+select.sel:focus { outline: none; border-color: var(--accent); }
+
+/* Main table */
+.table-wrap { overflow-x: auto; }
+table.main-tbl { width: 100%; border-collapse: collapse; min-width: 1100px; font-size: 12px; }
+table.main-tbl thead tr.grp th { padding: 5px 6px; text-align: center; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: #f0ede8; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+table.main-tbl thead tr.sub th { padding: 5px 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: #f6f4f0; border-bottom: 2px solid var(--border-dark); text-align: right; white-space: nowrap; vertical-align: bottom; }
+table.main-tbl thead tr.sub th.left { text-align: left; }
+table.main-tbl thead tr.sub th.res { background: #fff3e0; color: var(--brown); }
+table.main-tbl thead tr.sub th.act { background: #e8f5f5; color: var(--accent); }
+table.main-tbl tbody tr { border-bottom: 1px solid #e8e5df; }
+table.main-tbl tbody tr:hover td { background-color: rgba(0,0,0,0.015); }
+table.main-tbl tbody td { padding: 5px 6px; vertical-align: middle; text-align: right; border-right: 1px solid #eceae5; }
+table.main-tbl tbody td.left { text-align: left; }
+table.main-tbl tbody td.mono { font-family: var(--mono); font-size: 11.5px; }
+
+.phase-tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+.phase-h { background: var(--blue-light); color: var(--blue); }
+.phase-e { background: var(--purple-bg); color: var(--purple); }
+.phase-r { background: var(--brown-bg); color: var(--brown); }
+
+tr.row-h td { background: #fafcff; }
+tr.row-e td { background: #fdf9ff; }
+tr.row-r td { background: #fffbf8; }
+tr.layer-first td { border-top: 2px solid var(--border); }
+td.cell-result { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); background: #f0faf8; }
+tr.grand-total td { border-top: 2px solid var(--border-dark); background: #e8f5f5; font-weight: 700; font-size: 12px; }
+tr.grand-total td.val { font-family: var(--mono); color: var(--accent); font-size: 14px; }
+
+td input[type="number"] { font-family: var(--mono); font-size: 12px; width: 70px; border: 1px solid transparent; border-radius: 3px; padding: 2px 5px; text-align: right; background: transparent; color: var(--text); }
+td input[type="text"] { font-family: inherit; font-size: 12px; border: 1px solid transparent; border-radius: 3px; padding: 2px 5px; text-align: left; background: transparent; color: var(--text); width: 100%; }
+td input:hover { border-color: var(--border); background: var(--bg); }
+td input:focus { outline: none; border-color: var(--accent); background: white; }
+
+.btn-api { width: 20px; height: 20px; border-radius: 3px; background: var(--green-bg); border: 1px solid var(--green-border); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--green); font-weight: 700; flex-shrink: 0; }
+.btn-api:hover { background: #c5f0d8; }
+.btn-api.loading span { display: inline-block; animation: spin .7s linear infinite; }
+.btn-api.ok { background: #27ae75; border-color: #27ae75; color: white; }
+.btn-api.err { background: #fde8e8; border-color: #f4a0a0; color: var(--red); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-del { width: 18px; height: 18px; background: none; border: none; cursor: pointer; color: #bbb; font-size: 13px; padding: 0; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; }
+.btn-del:hover { background: #fde8e8; color: var(--red); }
+.layer-ctrl { display: flex; align-items: center; gap: 4px; }
+
+/* Add form */
+.add-area { padding: 11px 14px; border-top: 2px dashed var(--border); background: #f9f8f5; }
+.add-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.fg { display: flex; flex-direction: column; gap: 3px; }
+.fg label { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.fg input, .fg select { font-family: var(--mono); font-size: 12px; border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; background: white; color: var(--text); width: 78px; }
+.fg input[type="text"] { font-family: inherit; width: 130px; }
+.fg input:focus, .fg select:focus { outline: none; border-color: var(--accent); }
+.btn-add { padding: 6px 14px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; align-self: flex-end; }
+.btn-add:hover { background: var(--accent2); }
+
+/* Results */
+.result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; padding: 13px; }
+.card { border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; border-left-width: 3px; }
+.card .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 5px; }
+.card .val { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+.card .unt { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.card.h { border-left-color: var(--blue); } .card.h .val { color: var(--blue); }
+.card.e { border-left-color: var(--purple); } .card.e .val { color: var(--purple); }
+.card.r { border-left-color: var(--brown); } .card.r .val { color: var(--brown); }
+.card.g { border-left-color: var(--accent); } .card.g .val { color: var(--accent); }
+.card.n { border-left-color: var(--amber); background: var(--amber-bg); } .card.n .val { color: var(--amber); }
+.formula-line { margin: 0 13px 13px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.8; }
+.formula-line strong { color: var(--text); }
+.footnote { padding: 7px 14px; border-top: 1px solid var(--border); background: var(--bg); font-size: 10px; color: var(--muted); line-height: 1.6; }
+
+/* Charts */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+@media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+.chart-pane { padding: 16px 18px; border-right: 1px solid var(--border); }
+.chart-pane:last-child { border-right: none; }
+.chart-pane h3 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.chart-pane h3 span { font-weight: 400; }
+.chart-wrap { position: relative; height: 280px; }
+.chart-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: var(--muted); }
+.chart-controls select { font-size: 11px; border: 1px solid var(--border); border-radius: 3px; padding: 3px 8px; background: var(--bg); color: var(--text); cursor: pointer; }
+.chart-controls select:focus { outline: none; border-color: var(--accent); }
+.chart-legend { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.chart-legend span { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.chart-legend span::before { content: ''; width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.leg-h::before { background: #4a90d9; }
+.leg-e::before { background: #9b59b6; }
+.leg-r::before { background: #c0622a; }
+
+/* Modal */
+.overlay { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.38); align-items: flex-start; justify-content: center; padding: 48px 20px; }
+.overlay.visible { display: flex; }
+.search-modal { background: white; border-radius: 8px; width: 100%; max-width: 700px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 82vh; overflow: hidden; }
+.modal-head { background: var(--accent); color: white; padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+.modal-head h2 { font-size: 14px; font-weight: 600; }
+.modal-head p { font-size: 11px; opacity: 0.65; margin-top: 2px; }
+.btn-close { background: rgba(255,255,255,0.12); border: none; color: white; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 15px; }
+.btn-close:hover { background: rgba(255,255,255,0.25); }
+.modal-search-row { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
+.modal-search-row input { flex: 1; font-size: 13px; border: 1px solid var(--border); border-radius: 5px; padding: 7px 10px; outline: none; }
+.modal-search-row input:focus { border-color: var(--accent); }
+.btn-search { padding: 7px 16px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.btn-search:hover { background: var(--accent2); }
+.btn-search:disabled { opacity: 0.5; cursor: default; }
+.modal-body { overflow-y: auto; flex: 1; }
+.modal-status { padding: 20px 14px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.result-item { padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.result-item:hover { background: var(--blue-bg); }
+.r-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.r-meta { font-size: 11px; color: var(--muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 6px; }
+.r-meta span { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; }
+.r-badge { font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700; display: inline-block; margin-left: 6px; }
+.badge-a1 { background: var(--blue-bg); color: var(--blue); border: 1px solid #c5d9f5; }
+.badge-a2 { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+
+@keyframes flash-import { from{outline:3px solid #27ae75;outline-offset:-1px}to{outline:3px solid transparent} }
+.just-imported { animation: flash-import 1.5s ease-out; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>BNB Ökobilanzrechner · Neubau Büro- und Verwaltungsgebäude</h1>
+    <p>Bilanzierungsregeln Version 2015 · BMUB · BNB-Kriterien 1.1.1–1.2.1 · GWP · Live-Datenabruf aus Ökobaudat</p>
+  </div>
+  <div class="hdr-badges">
+    <a class="badge badge-gh" href="https://pages.github.com" target="_blank" title="Auf GitHub Pages hosten — löst alle CORS-Probleme">
+      ⬡ GitHub Pages
+    </a>
+    <div class="badge badge-api">⬢ ÖKOBAUDAT API</div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Gebäudeparameter -->
+  <div class="panel">
+    <div class="panel-header"><span>Gebäudeparameter</span><span class="note">Normierung auf NGF<sub>a</sub> × Δt (Formel 1+2)</span></div>
+    <div class="building-row">
+      <div class="info-field"><label>NGF<sub>a</sub> =</label><input type="number" id="ngfa" value="1000" min="1" step="10"><span class="unit">m²</span></div>
+      <div class="info-field"><label>Δt =</label><input type="number" id="dt" value="50" min="1" max="100" step="5"><span class="unit">a</span></div>
+      <div class="info-field"><label>Bauteilgruppe:</label><input type="text" id="bauteilName" value="Außenwand 1"></div>
+      <div style="margin-left:auto;font-size:11px;color:var(--muted)">
+        Klicke <span style="color:var(--green);font-weight:700">⬢</span> in einer Zeile → Ökobaudat durchsuchen → GWP-Faktoren automatisch importieren
+      </div>
+    </div>
+  </div>
+
+  <!-- API Status -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Ökobaudat API Verbindung</span>
+      <span class="note" id="proxyBadgeWrap" style="display:none"><span class="proxy-badge">⚡ CORS-Proxy aktiv</span></span>
+    </div>
+    <div class="api-bar">
+      <div class="dot" id="apiDot"></div>
+      <span class="api-lbl">ÖKOBAUDAT REST API</span>
+      <span class="api-detail" id="apiStatus">Verbindung wird geprüft…</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <label style="font-size:11px;color:var(--muted)">Datenbestand:</label>
+        <select class="sel" id="dsSelect">
+          <option value="cd2bda71-760b-4fcc-8a0b-3877c10000a8">2023-I (aktuell)</option>
+          <option value="de0ecfe8-8cdf-4ba8-a3f7-1c2e8f1c9bd9">2021-II</option>
+        </select>
+        <label style="font-size:11px;color:var(--muted)">Norm:</label>
+        <select class="sel" id="normSelect">
+          <option value="">Alle</option>
+          <option value="b00f9ec0-7874-11e3-981f-0800200c9a66">EN 15804+A1</option>
+          <option value="c0016b33-8cf7-415c-ac6e-deba0d21440d">EN 15804+A2</option>
+        </select>
+      </span>
+    </div>
+    <div class="cors-hint" id="corsHint" style="display:none">
+      <strong>⚠ CORS-Fehler beim Öffnen als lokale Datei (file://):</strong>
+      Browser blockieren API-Anfragen aus Sicherheitsgründen. Drei Lösungen:
+      <strong>① GitHub Pages</strong> — Datei in ein GitHub-Repository hochladen → Settings → Pages → Deploy (kostenlos, löst CORS dauerhaft).
+      <strong>② Lokal mit Server</strong> — Im Terminal: <code>python3 -m http.server 8080</code>, dann <a href="http://localhost:8080" target="_blank">localhost:8080</a> öffnen.
+      <strong>③ Manuell</strong> — Faktoren direkt in der Tabelle eingeben, API-Suche nicht nötig.
+    </div>
+  </div>
+
+  <!-- Bauteilkatalog -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Bauteilkatalog · Schichtaufbau (Layout nach BNB 2015 Anhang Beispiel 1)</span>
+      <span class="note">
+        <span style="color:var(--blue)">■</span> Herstellung &nbsp;
+        <span style="color:var(--purple)">■</span> Erneuerung &nbsp;
+        <span style="color:var(--brown)">■</span> Entsorgung
+      </span>
+    </div>
+    <div class="table-wrap">
+      <table class="main-tbl">
+        <thead>
+          <tr class="grp">
+            <th colspan="2" style="text-align:left">Bauteil</th>
+            <th colspan="3">Ökobaudat</th>
+            <th colspan="2">Geometrie</th>
+            <th colspan="2">Menge</th>
+            <th colspan="2" style="background:#fff3e0;color:var(--brown)">Treibhauspotenzial GWP</th>
+            <th></th>
+          </tr>
+          <tr class="sub">
+            <th class="left" style="width:115px">Bauteil.Schicht</th>
+            <th class="left" style="width:70px">Phase</th>
+            <th class="left" style="width:30px"></th>
+            <th class="left" style="width:195px">Ökobaudat-Basisname</th>
+            <th style="width:50px">ND [a]</th>
+            <th style="width:50px">Anz.</th>
+            <th style="width:68px">Dicke [mm]</th>
+            <th style="width:70px">Fläche [m²]</th>
+            <th style="width:70px">Vol. [m³]</th>
+            <th style="width:74px">Masse [kg]</th>
+            <th class="res" style="width:120px">Faktor [CO₂/m³|kg]</th>
+            <th class="act" style="width:95px">GWP [kg CO₂-Äqu.]</th>
+            <th style="width:22px"></th>
+          </tr>
+        </thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+    </div>
+    <div class="add-area">
+      <div class="add-form">
+        <div class="fg"><label>Schicht</label><input type="text" id="f_sch" placeholder="Bezeichnung"></div>
+        <div class="fg"><label>Ökobaudat-Name</label><input type="text" id="f_oko" placeholder="Datensatzname" style="width:165px"></div>
+        <div class="fg"><label>ND [a]</label><input type="number" id="f_nd" value="50" min="1"></div>
+        <div class="fg"><label>Dicke [mm]</label><input type="number" id="f_di" value="10" min="0"></div>
+        <div class="fg"><label>Fläche [m²]</label><input type="number" id="f_fl" value="1000" min="0"></div>
+        <div class="fg"><label>Rohdichte</label><input type="number" id="f_rh" value="1000" min="0" step="0.1"></div>
+        <div class="fg"><label>Faktor H</label><input type="number" id="f_gh" value="0.140" step="0.001"></div>
+        <div class="fg"><label>Faktor EoL</label><input type="number" id="f_ge" value="0.016" step="0.001"></div>
+        <div class="fg"><label>Einheit</label>
+          <select id="f_eu" style="width:80px">
+            <option value="kg">CO₂/kg</option>
+            <option value="m3">CO₂/m³</option>
+          </select>
+        </div>
+        <button class="btn-add" onclick="addLayer()">+ Schicht hinzufügen</button>
+      </div>
+    </div>
+    <div class="footnote">
+      ND = Nutzungsdauer · Anz. = Erneuerungen: ⌈Δt/ND⌉−1 · Entsorgung: 1+Erneuerungen ·
+      GWP = Faktor × (Masse oder Volumen) × Anzahl · <strong style="color:var(--green)">⬢</strong> = Ökobaudat Live-Suche
+    </div>
+  </div>
+
+  <!-- Ergebnisse + Diagramme -->
+  <div class="panel">
+    <div class="panel-header"><span>Ergebnisse — GWP (BNB 1.1.1)</span><span class="note">uwg = UWG<sub>ges</sub> / NGF<sub>a</sub> [Formel 1]</span></div>
+    <div class="result-grid" id="resGrid"></div>
+    <div class="formula-line" id="formulaLine"></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="panel">
+    <div class="panel-header"><span>GWP-Analyse nach Bauteil</span></div>
+    <div class="chart-grid">
+
+      <!-- Chart 1: Absolut -->
+      <div class="chart-pane">
+        <h3>
+          <span>Gesamt-GWP je Bauteilschicht [kg CO₂-Äqu.]</span>
+        </h3>
+        <div class="chart-legend">
+          <span class="leg-h">Herstellung (H)</span>
+          <span class="leg-e">Erneuerung (E)</span>
+          <span class="leg-r">Entsorgung/EoL (R)</span>
+        </div>
+        <div class="chart-wrap" style="margin-top:10px">
+          <canvas id="chartAbs"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: Spezifisch -->
+      <div class="chart-pane">
+        <h3>
+          <span>Spezifischer GWP je Bauteilschicht</span>
+          <select id="specMode" onchange="updateCharts()">
+            <option value="total">Gesamt [kg CO₂-Äqu. / Schicht]</option>
+            <option value="kg">Pro Masse [kg CO₂-Äqu. / kg Material]</option>
+            <option value="m3">Pro Volumen [kg CO₂-Äqu. / m³]</option>
+            <option value="m2">Pro Fläche [kg CO₂-Äqu. / m²]</option>
+          </select>
+        </h3>
+        <div class="chart-legend">
+          <span class="leg-h">Herstellung (H)</span>
+          <span class="leg-e">Erneuerung (E)</span>
+          <span class="leg-r">Entsorgung/EoL (R)</span>
+        </div>
+        <div class="chart-wrap" style="margin-top:10px">
+          <canvas id="chartSpec"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="search-modal">
+    <div class="modal-head">
+      <div><h2>Ökobaudat Materialsuche</h2><p id="modalSubtitle">Datensatz suchen und importieren</p></div>
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-search-row">
+      <input type="text" id="modalInput" placeholder="Materialname, z. B. Gipsputz, EPS, Kalksandstein…">
+      <button class="btn-search" id="btnSearch" onclick="doSearch()">Suchen</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="modal-status">Suchbegriff eingeben und »Suchen« klicken.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================
+   CONFIG
+   ===================================================== */
+const BASE = 'https://oekobaudat.de/OEKOBAU.DAT/resource';
+const PROXIES = [
+  u => u,
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+];
+let activeProxy = 0;
+let activeLayerId = null;
+let uid = 10;
+let chartAbs = null, chartSpec = null;
+
+const GWP_UUIDS = new Set([
+  '77e416eb-a363-4258-a04e-171d843a6460',
+  'f49d46a7-01ad-4ddc-9ae4-c40dd2e75f87',
+  'd7ae2a00-76ef-4b54-b5c8-305797b49f10',
+]);
+const GWP_KEYS = ['gwp','global warm','climate change','treibhaus'];
+
+/* =====================================================
+   DATA
+   ===================================================== */
+let layers = [
+  {id:1,sch:'Außenwand 1.1',grp:'Gipsputz',            oko:'Gipsputz',                                        nd:50,di:10, fl:1000,rh:1000, gh:0.14000,ge:0.01600,vol:false},
+  {id:2,sch:'Außenwand 1.2',grp:'Kalksandstein',        oko:'Kalksandstein Mix',                               nd:50,di:240,fl:1000,rh:1900, gh:0.15600,ge:0.00273,vol:false},
+  {id:3,sch:'Außenwand 1.3',grp:'WDVS (EPS)',           oko:'EPS-Hartschaum (Styropor®) W/D-035',              nd:40,di:160,fl:1000,rh:22.9, gh:59.5000,ge:37.6000,vol:true},
+  {id:4,sch:'Außenwand 1.4',grp:'WDVS-Kleber und Putz', oko:'WDVS Verklebung und Beschichtung Silikonharzputz',nd:40,di:10, fl:1000,rh:1218, gh:0.49000,ge:0.00804,vol:false},
+];
+
+/* =====================================================
+   CALC
+   ===================================================== */
+const dt50 = () => parseFloat(document.getElementById('dt').value)||50;
+const ngfa = () => parseFloat(document.getElementById('ngfa').value)||1000;
+
+function calc(l) {
+  const dt=dt50(), vol=(l.di/1000)*l.fl, mass=vol*l.rh;
+  const nRen=Math.max(0,Math.ceil(dt/l.nd)-1), nEoL=1+nRen;
+  const base=l.vol?vol:mass;
+  const gwpH=base*l.gh, gwpE=nRen>0?nRen*gwpH:0, gwpR=nEoL*base*l.ge;
+  return {vol,mass,nRen,nEoL,base,gwpH,gwpE,gwpR,gwpG:gwpH+gwpE+gwpR};
+}
+
+const f=(n,d=0)=>isNaN(n)||!isFinite(n)?'–':n.toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+/* =====================================================
+   RENDER TABLE
+   ===================================================== */
+function render() {
+  const dt=dt50(), ng=ngfa();
+  let totH=0,totE=0,totR=0,totG=0, html='';
+
+  layers.forEach(l => {
+    const c=calc(l);
+    totH+=c.gwpH; totE+=c.gwpE; totR+=c.gwpR; totG+=c.gwpG;
+    const factorCell = `
+      <select style="font-size:10px;border:1px solid var(--border);border-radius:3px;padding:1px 3px;background:var(--bg);margin-right:3px" onchange="upd(${l.id},'vol',this.value)">
+        <option value="kg" ${!l.vol?'selected':''}>CO₂/kg</option>
+        <option value="m3" ${l.vol?'selected':''}>CO₂/m³</option>
+      </select>
+      <input type="number" value="${l.gh}" min="0" step="0.001" onchange="upd(${l.id},'gh',this.value)" style="width:65px;font-family:var(--mono);font-size:11px;border:1px solid transparent;border-radius:3px;padding:2px 4px;text-align:right;background:transparent" onmouseover="this.style.borderColor='var(--border)'" onmouseout="if(document.activeElement!==this)this.style.borderColor='transparent'" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='transparent'">`;
+
+    // Herstellung
+    html += `<tr class="row-h layer-first" id="tr${l.id}">
+      <td class="left">
+        <div class="layer-ctrl">
+          <button class="btn-api" id="ab${l.id}" onclick="openModal(${l.id})" title="Ökobaudat suchen">⬢</button>
+          <input type="text" value="${esc(l.sch)}" onchange="upd(${l.id},'sch',this.value)" style="width:88px">
+        </div>
+      </td>
+      <td class="left"><span class="phase-tag phase-h">Herstellung</span></td>
+      <td></td>
+      <td class="left"><input type="text" value="${esc(l.oko)}" onchange="upd(${l.id},'oko',this.value)" style="width:183px"></td>
+      <td><input type="number" value="${l.nd}" min="1" onchange="upd(${l.id},'nd',this.value)" style="width:44px"></td>
+      <td class="mono" style="color:var(--muted)">1</td>
+      <td><input type="number" value="${l.di}" min="0" step="1" onchange="upd(${l.id},'di',this.value)"></td>
+      <td><input type="number" value="${l.fl}" min="0" onchange="upd(${l.id},'fl',this.value)"></td>
+      <td class="mono">${f(c.vol,1)}</td>
+      <td class="mono">${f(c.mass,0)}</td>
+      <td style="background:#fff7f0">${factorCell}</td>
+      <td class="cell-result">${f(c.gwpH,3)}</td>
+      <td rowspan="${c.nRen>0?3:2}" style="vertical-align:middle;border-left:1px solid var(--border-dark)">
+        <button class="btn-del" onclick="del(${l.id})">×</button>
+      </td>
+    </tr>`;
+
+    // Erneuerung (nur wenn nRen > 0)
+    if (c.nRen > 0) {
+      html += `<tr class="row-e">
+        <td class="left" style="color:var(--muted);font-size:11px;padding-left:12px">${esc(l.grp||l.sch)}</td>
+        <td class="left"><span class="phase-tag phase-e">Erneuerung</span></td>
+        <td colspan="2" class="left" style="color:var(--muted);font-size:11px">${esc(l.oko)}</td>
+        <td></td>
+        <td class="mono" style="color:var(--purple);font-weight:700">${c.nRen}</td>
+        <td class="mono" style="color:var(--muted)">${f(l.di,0)}</td>
+        <td class="mono" style="color:var(--muted)">${f(l.fl,0)}</td>
+        <td class="mono" style="color:var(--muted)">${f(c.vol,1)}</td>
+        <td class="mono" style="color:var(--muted)">${f(c.mass,0)}</td>
+        <td class="mono" style="background:#fff7f0;text-align:right;color:var(--muted)">${f(l.gh,5)}</td>
+        <td class="cell-result" style="color:var(--purple)">${f(c.gwpE,3)}</td>
+      </tr>`;
+    }
+
+    // Entsorgung
+    html += `<tr class="row-r">
+      <td class="left" style="color:var(--muted);font-size:11px;padding-left:12px">${esc(l.grp||l.sch)}</td>
+      <td class="left"><span class="phase-tag phase-r">Entsorgung</span></td>
+      <td colspan="2" class="left" style="color:var(--muted);font-size:11px">${esc(l.oko)}</td>
+      <td></td>
+      <td class="mono" style="color:var(--brown);font-weight:700">${c.nEoL}</td>
+      <td class="mono" style="color:var(--muted)">${f(l.di,0)}</td>
+      <td class="mono" style="color:var(--muted)">${f(l.fl,0)}</td>
+      <td class="mono" style="color:var(--muted)">${f(c.vol,1)}</td>
+      <td class="mono" style="color:var(--muted)">${f(c.mass,0)}</td>
+      <td style="background:#fff7f0;text-align:right">
+        <input type="number" value="${l.ge}" min="0" step="0.001" onchange="upd(${l.id},'ge',this.value)" style="width:65px;font-family:var(--mono);font-size:11px;border:1px solid transparent;border-radius:3px;padding:2px 4px;text-align:right;background:transparent" onmouseover="this.style.borderColor='var(--border)'" onmouseout="if(document.activeElement!==this)this.style.borderColor='transparent'" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='transparent'">
+      </td>
+      <td class="cell-result" style="color:var(--brown)">${f(c.gwpR,3)}</td>
+    </tr>`;
+  });
+
+  if (layers.length > 0) {
+    html += `<tr class="grand-total">
+      <td colspan="11" class="left" style="font-weight:700;padding-left:14px">∑ Summen</td>
+      <td class="val">${f(totG,3)}</td><td></td>
+    </tr>`;
+  } else {
+    html = `<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--muted);font-style:italic">Keine Schichten — neue hinzufügen.</td></tr>`;
+  }
+  document.getElementById('tblBody').innerHTML = html;
+
+  // Summary cards
+  const uwg=totG/(ng*dt50()), uwgH=totH/(ng*dt50()), uwgE=totE/(ng*dt50()), uwgR=totR/(ng*dt50());
+  document.getElementById('resGrid').innerHTML = `
+    <div class="card h"><div class="lbl">GWP Herstellung H</div><div class="val">${f(totH,0)}</div><div class="unt">kg CO₂-Äqu. gesamt</div></div>
+    <div class="card e"><div class="lbl">GWP Erneuerung E</div><div class="val">${f(totE,0)}</div><div class="unt">kg CO₂-Äqu. gesamt</div></div>
+    <div class="card r"><div class="lbl">GWP Entsorgung EoL R</div><div class="val">${f(totR,0)}</div><div class="unt">kg CO₂-Äqu. gesamt</div></div>
+    <div class="card g"><div class="lbl">GWP gesamt H+E+R</div><div class="val">${f(totG,0)}</div><div class="unt">kg CO₂-Äqu. gesamt</div></div>
+    <div class="card n"><div class="lbl">uwg normiert</div><div class="val">${uwg.toFixed(3)}</div><div class="unt">kg CO₂-Äqu./(m²·a)</div></div>`;
+  document.getElementById('formulaLine').innerHTML =
+    `<strong>Formel 1+2:</strong> uwg = ${f(totG,0)} ÷ (${f(ng,0)} m² × ${dt50()} a) = <strong>${uwg.toFixed(4)} kg CO₂-Äqu./(m²·a)</strong> | H=${uwgH.toFixed(4)} E=${uwgE.toFixed(4)} R=${uwgR.toFixed(4)}`;
+
+  updateCharts();
+}
+
+function upd(id,key,raw){
+  const l=layers.find(x=>x.id===id);if(!l)return;
+  if(key==='vol')l.vol=(raw==='m3');
+  else if(['sch','grp','oko'].includes(key))l[key]=raw;
+  else l[key]=parseFloat(raw)||0;
+  render();
+}
+function del(id){layers=layers.filter(x=>x.id!==id);render();}
+function addLayer(){
+  const sch=document.getElementById('f_sch').value.trim();
+  if(!sch){alert('Bitte Schichtname eingeben.');return;}
+  const idx=layers.length+1;
+  layers.push({id:uid++,sch:`Bauteil ${idx}.1`,grp:sch,
+    oko:document.getElementById('f_oko').value.trim()||sch,
+    nd:parseFloat(document.getElementById('f_nd').value)||50,
+    di:parseFloat(document.getElementById('f_di').value)||10,
+    fl:parseFloat(document.getElementById('f_fl').value)||1000,
+    rh:parseFloat(document.getElementById('f_rh').value)||1000,
+    gh:parseFloat(document.getElementById('f_gh').value)||0,
+    ge:parseFloat(document.getElementById('f_ge').value)||0,
+    vol:document.getElementById('f_eu').value==='m3'});
+  document.getElementById('f_sch').value='';
+  document.getElementById('f_oko').value='';
+  render();
+}
+
+/* =====================================================
+   CHARTS
+   ===================================================== */
+const COLORS = {
+  h: 'rgba(74,144,217,0.85)',
+  e: 'rgba(155,89,182,0.85)',
+  r: 'rgba(192,98,42,0.85)',
+  hB: 'rgba(74,144,217,1)',
+  eB: 'rgba(155,89,182,1)',
+  rB: 'rgba(192,98,42,1)',
+};
+
+function updateCharts() {
+  const labels = layers.map(l => l.grp || l.sch);
+  const calcs  = layers.map(l => calc(l));
+
+  const gwpH = calcs.map(c => +c.gwpH.toFixed(3));
+  const gwpE = calcs.map(c => +c.gwpE.toFixed(3));
+  const gwpR = calcs.map(c => +c.gwpR.toFixed(3));
+
+  // ——— Chart 1: Absolut stacked bar ———
+  const absData = {
+    labels,
+    datasets: [
+      { label: 'Herstellung (H)', data: gwpH, backgroundColor: COLORS.h, borderColor: COLORS.hB, borderWidth: 1 },
+      { label: 'Erneuerung (E)',  data: gwpE, backgroundColor: COLORS.e, borderColor: COLORS.eB, borderWidth: 1 },
+      { label: 'Entsorgung (R)',  data: gwpR, backgroundColor: COLORS.r, borderColor: COLORS.rB, borderWidth: 1 },
+    ]
+  };
+  const absOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: {
+      label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('de-DE',{maximumFractionDigits:1})} kg CO₂-Äqu.`
+    }}},
+    scales: {
+      x: { stacked: true, ticks: { font: { size: 10 }, maxRotation: 30 }, grid: { display: false } },
+      y: { stacked: true, ticks: { font: { size: 10 }, callback: v => v.toLocaleString('de-DE') }, grid: { color: '#f0ede8' } }
+    }
+  };
+  if (chartAbs) { chartAbs.data = absData; chartAbs.update(); }
+  else { chartAbs = new Chart(document.getElementById('chartAbs'), { type: 'bar', data: absData, options: absOpts }); }
+
+  // ——— Chart 2: Spezifisch ———
+  buildSpecChart(labels, calcs);
+}
+
+function buildSpecChart(labels, calcs) {
+  const mode = document.getElementById('specMode').value;
+  let gwpH, gwpE, gwpR, yLabel;
+
+  if (mode === 'total') {
+    gwpH = calcs.map(c=>+c.gwpH.toFixed(3));
+    gwpE = calcs.map(c=>+c.gwpE.toFixed(3));
+    gwpR = calcs.map(c=>+c.gwpR.toFixed(3));
+    yLabel = 'kg CO₂-Äqu.';
+  } else if (mode === 'kg') {
+    gwpH = calcs.map((c,i) => c.mass>0 ? +(c.gwpH/c.mass).toFixed(5) : 0);
+    gwpE = calcs.map((c,i) => c.mass>0 ? +(c.gwpE/c.mass).toFixed(5) : 0);
+    gwpR = calcs.map((c,i) => c.mass>0 ? +(c.gwpR/c.mass).toFixed(5) : 0);
+    yLabel = 'kg CO₂-Äqu. / kg';
+  } else if (mode === 'm3') {
+    gwpH = calcs.map(c => c.vol>0 ? +(c.gwpH/c.vol).toFixed(4) : 0);
+    gwpE = calcs.map(c => c.vol>0 ? +(c.gwpE/c.vol).toFixed(4) : 0);
+    gwpR = calcs.map(c => c.vol>0 ? +(c.gwpR/c.vol).toFixed(4) : 0);
+    yLabel = 'kg CO₂-Äqu. / m³';
+  } else { // m2
+    gwpH = calcs.map((c,i) => layers[i].fl>0 ? +(c.gwpH/layers[i].fl).toFixed(4) : 0);
+    gwpE = calcs.map((c,i) => layers[i].fl>0 ? +(c.gwpE/layers[i].fl).toFixed(4) : 0);
+    gwpR = calcs.map((c,i) => layers[i].fl>0 ? +(c.gwpR/layers[i].fl).toFixed(4) : 0);
+    yLabel = 'kg CO₂-Äqu. / m²';
+  }
+
+  const specData = {
+    labels,
+    datasets: [
+      { label: 'Herstellung (H)', data: gwpH, backgroundColor: COLORS.h, borderColor: COLORS.hB, borderWidth: 1 },
+      { label: 'Erneuerung (E)',  data: gwpE, backgroundColor: COLORS.e, borderColor: COLORS.eB, borderWidth: 1 },
+      { label: 'Entsorgung (R)',  data: gwpR, backgroundColor: COLORS.r, borderColor: COLORS.rB, borderWidth: 1 },
+    ]
+  };
+  const specOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: {
+      label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('de-DE',{maximumFractionDigits:5})} ${yLabel}`
+    }}},
+    scales: {
+      x: { stacked: true, ticks: { font:{size:10}, maxRotation:30 }, grid: { display: false } },
+      y: { stacked: true, title: { display: true, text: yLabel, font:{size:10}, color:'#6b6860' },
+           ticks: { font:{size:10}, callback: v => v.toLocaleString('de-DE') }, grid: { color: '#f0ede8' } }
+    }
+  };
+  if (chartSpec) { chartSpec.data = specData; chartSpec.options = specOpts; chartSpec.update(); }
+  else { chartSpec = new Chart(document.getElementById('chartSpec'), { type: 'bar', data: specData, options: specOpts }); }
+}
+
+/* =====================================================
+   API + PROXY
+   ===================================================== */
+async function apiFetch(url) {
+  for (let i = activeProxy; i < PROXIES.length; i++) {
+    try {
+      const r = await fetch(PROXIES[i](url), { headers:{'Accept':'application/json'} });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const json = await r.json();
+      if (i !== activeProxy) {
+        activeProxy = i;
+        document.getElementById('proxyBadgeWrap').style.display = i > 0 ? '' : 'none';
+      }
+      document.getElementById('corsHint').style.display = 'none';
+      return json;
+    } catch(e) {
+      if (i === PROXIES.length - 1) {
+        document.getElementById('corsHint').style.display = '';
+        throw e;
+      }
+    }
+  }
+}
+
+async function checkApi() {
+  const ds = document.getElementById('dsSelect').value;
+  const dot = document.getElementById('apiDot'), st = document.getElementById('apiStatus');
+  dot.className = 'dot loading'; st.textContent = 'Verbinde…';
+  activeProxy = 0;
+  try {
+    const j = await apiFetch(`${BASE}/datastocks/${ds}/processes?search=true&name=Gipsputz&format=JSON&pageSize=2`);
+    const total = j.totalCount ?? j.data?.length ?? '?';
+    const proxyNames = ['direkt','corsproxy.io','allorigins.win'];
+    dot.className = 'dot ok';
+    st.textContent = `Verbunden (${proxyNames[activeProxy]}) · ${total} Treffer für Testabfrage „Gipsputz"`;
+    document.getElementById('proxyBadgeWrap').style.display = activeProxy > 0 ? '' : 'none';
+  } catch(e) {
+    dot.className = 'dot err';
+    st.textContent = `Alle ${PROXIES.length} Verbindungswege fehlgeschlagen — API-Suche nicht verfügbar`;
+    document.getElementById('corsHint').style.display = '';
+  }
+}
+document.getElementById('dsSelect').addEventListener('change', () => { activeProxy=0; checkApi(); });
+checkApi();
+
+/* =====================================================
+   MODAL
+   ===================================================== */
+function openModal(layerId) {
+  activeLayerId = layerId;
+  const l = layers.find(x=>x.id===layerId);
+  document.getElementById('modalSubtitle').textContent = `Datensatz für Schicht „${l.grp||l.sch}" suchen`;
+  document.getElementById('modalInput').value = l.oko||l.grp||l.sch;
+  document.getElementById('modalBody').innerHTML = '<div class="modal-status">Suchbegriff eingeben und »Suchen« klicken.</div>';
+  document.getElementById('overlay').classList.add('visible');
+  setTimeout(()=>{const i=document.getElementById('modalInput');i.focus();i.select();},80);
+}
+function closeModal(){document.getElementById('overlay').classList.remove('visible');activeLayerId=null;}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+document.getElementById('modalInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+
+async function doSearch(){
+  const q=document.getElementById('modalInput').value.trim();if(!q)return;
+  const ds=document.getElementById('dsSelect').value,norm=document.getElementById('normSelect').value;
+  const btn=document.getElementById('btnSearch'),body=document.getElementById('modalBody');
+  btn.disabled=true;btn.textContent='…';
+  body.innerHTML='<div class="modal-status">Suche läuft…</div>';
+  try{
+    let url=`${BASE}/datastocks/${ds}/processes?search=true&name=${encodeURIComponent(q)}&format=JSON&pageSize=30`;
+    if(norm)url+=`&compliance=${norm}`;
+    const json=await apiFetch(url);
+    const items=json.data||json.processes||[];
+    if(!items.length){body.innerHTML='<div class="modal-status">Keine Treffer. Anderen Suchbegriff versuchen.</div>';return;}
+    body.innerHTML=items.map(p=>{
+      const name=getName(p),uuid=p.uuid,ver=p.version||'';
+      const compls=(p.complianceSystems||[]).map(c=>{
+        const cn=getName(c);
+        if(/A2|\+A2/.test(cn))return'<span class="r-badge badge-a2">A2</span>';
+        if(/A1|15804/.test(cn))return'<span class="r-badge badge-a1">A1</span>';
+        return'';
+      }).join('');
+      const cats=(p.classificationInformation?.classification||[]).flatMap(c=>c.classes?.clazz||[]).map(c=>getName(c)||'').filter(Boolean).join(' › ');
+      return`<div class="result-item" onclick="importDataset('${uuid}','${esc(ver)}')">
+        <div class="r-name">${esc(name)}${compls}</div>
+        <div class="r-meta"><span>UUID: ${uuid.slice(0,8)}…</span>${ver?`<span>v${ver}</span>`:''} ${cats?`<span>${esc(cats.slice(0,55))}</span>`:''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    body.innerHTML=`<div class="modal-status" style="color:var(--red)">Fehler: ${e.message}<br><small>Tipp: Auf GitHub Pages hosten oder lokalen Server starten.</small></div>`;
+  }finally{btn.disabled=false;btn.textContent='Suchen';}
+}
+
+async function importDataset(uuid,version){
+  if(activeLayerId===null)return;
+  const ds=document.getElementById('dsSelect').value;
+  const body=document.getElementById('modalBody');
+  body.innerHTML='<div class="modal-status">Datensatz wird geladen…</div>';
+  const btn=document.getElementById('ab'+activeLayerId);
+  if(btn){btn.className='btn-api loading';btn.innerHTML='<span>↻</span>';}
+  try{
+    const vq=version?`version=${version}&`:'';
+    const dsj=await apiFetch(`${BASE}/datastocks/${ds}/processes/${uuid}?${vq}format=JSON&view=extended`);
+    const res=extractGWP(dsj);
+    const l=layers.find(x=>x.id===activeLayerId);
+    if(l&&res&&(res.gwpH!==null||res.gwpEoL!==null)){
+      const pn=getName(dsj);if(pn)l.oko=pn;
+      if(res.gwpH!==null)l.gh=res.gwpH;
+      if(res.gwpEoL!==null)l.ge=res.gwpEoL;
+      if(res.unit==='m3')l.vol=true;else if(res.unit==='kg')l.vol=false;
+      body.innerHTML=buildDetailHTML(res,getName(dsj),uuid);
+      const tr=document.getElementById('tr'+activeLayerId);
+      if(tr){tr.classList.remove('just-imported');void tr.offsetWidth;tr.classList.add('just-imported');}
+      if(btn){btn.className='btn-api ok';btn.innerHTML='✓';setTimeout(()=>{btn.className='btn-api';btn.innerHTML='⬢';},3000);}
+      render();
+    }else{
+      body.innerHTML=`<div class="modal-status" style="color:var(--amber)">Datensatz geladen, aber keine GWP-Modulwerte (A1-A3/C3/C4) gefunden.</div>`;
+      if(btn){btn.className='btn-api err';btn.innerHTML='!';setTimeout(()=>{btn.className='btn-api';btn.innerHTML='⬢';},3000);}
+    }
+  }catch(e){
+    body.innerHTML=`<div class="modal-status" style="color:var(--red)">Ladefehler: ${e.message}</div>`;
+    if(btn){btn.className='btn-api err';btn.innerHTML='!';setTimeout(()=>{btn.className='btn-api';btn.innerHTML='⬢';},3000);}
+  }
+}
+
+/* =====================================================
+   GWP EXTRACTION
+   ===================================================== */
+function extractGWP(ds){
+  let gwpH=null,gwpEoL=null,unit='kg';
+  try{
+    for(const ex of ds.exchanges?.exchange||[]){
+      if(ex['@referenceFlow']==='true'||ex.referenceFlow===true||ex.referenceFlow==='true'){
+        const rfn=((ds.exchanges?.exchange||[]).find(x=>x['@referenceFlow']==='true')?.referenceToFlowDataSet?.shortDescription||[]);
+        const s=Array.isArray(rfn)?((rfn.find(x=>x['@xml:lang']==='en')||rfn[0]||{}).value||''):String(rfn);
+        if(/m3|m²|m³|qm/i.test(s))unit='m3';
+        break;
+      }
+    }
+  }catch(e){}
+  try{
+    let candidates=[];
+    for(const res of ds.LCIAResults?.LCIAResult||[]){
+      const ru=(res.referenceToLCIAMethodDataSet?.['@refObjectId']||res.referenceToLCIAMethodDataSet?.refObjectId||'').toLowerCase();
+      const rn=(getName(res.referenceToLCIAMethodDataSet)||'').toLowerCase();
+      if(!GWP_UUIDS.has(ru)&&!GWP_KEYS.some(k=>rn.includes(k)))continue;
+      const mods=parseModules(res);
+      const h=sumMods(mods,['A1-A3','A1A2A3','A1','A2','A3']);
+      const c3=sumMods(mods,['C3']),c4=sumMods(mods,['C4']);
+      const c34=sumMods(mods,['C3-C4','C3+C4','C3C4'])??(c3!==null||c4!==null?(c3||0)+(c4||0):null);
+      candidates.push({name:rn,h,c34});
+    }
+    const p=candidates.find(c=>c.name.includes('total'))||candidates.find(c=>c.name.includes('fossil'))||candidates[0];
+    if(p){if(p.h!==null)gwpH=p.h;if(p.c34!==null)gwpEoL=p.c34;}
+  }catch(e){console.error(e);}
+  return{gwpH,gwpEoL,unit};
+}
+function parseModules(res){
+  const out={},raw=res.other?.anies||res.other?.any||res.anies||[];
+  if(Array.isArray(raw)){
+    let cur=null;
+    for(const a of raw){
+      const nm=a.name||a['@name']||'',vl=a.value??a['#text']??'';
+      if(nm==='module'||nm==='Modul'){cur=String(vl).trim();continue;}
+      if((nm==='amount'||nm==='meanAmount'||nm==='')&&cur){out[cur]=parseFloat(vl);cur=null;continue;}
+      if(a.module)out[String(a.module).trim()]=parseFloat(a.value??a.amount??a.meanAmount??0);
+    }
+  }else if(raw&&typeof raw==='object')for(const[k,v]of Object.entries(raw))if(!isNaN(parseFloat(v)))out[k]=parseFloat(v);
+  return out;
+}
+function sumMods(mods,keys){
+  let s=0,found=false;
+  for(const k of keys)for(const mk of Object.keys(mods))
+    if(mk.replace(/[\s\-+]/g,'').toUpperCase()===k.replace(/[\s\-+]/g,'').toUpperCase()){s+=mods[mk];found=true;}
+  return found?s:null;
+}
+function buildDetailHTML(r,name,uuid){
+  return`<div style="padding:14px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent)">${esc(name||'')}</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-family:var(--mono)">${uuid}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div style="background:var(--blue-bg);border:1px solid #c5d9f5;border-radius:5px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">GWP Herstellung (A1-A3)</div>
+        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue)">${r.gwpH!==null?r.gwpH.toFixed(5):'–'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">kg CO₂-Äqu. / ${r.unit}</div>
+      </div>
+      <div style="background:var(--brown-bg);border:1px solid #f0c8a0;border-radius:5px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">GWP EoL (C3+C4)</div>
+        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--brown)">${r.gwpEoL!==null?r.gwpEoL.toFixed(5):'–'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">kg CO₂-Äqu. / ${r.unit}</div>
+      </div>
+      <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:5px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Deklarierte Einheit</div>
+        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--green)">${r.unit}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">automatisch gesetzt</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:9px 12px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:5px;font-size:12px;color:var(--green);font-weight:600">
+      ✓ Werte wurden in die Schicht importiert — Fenster kann geschlossen werden.
+    </div>
+  </div>`;
+}
+function getName(obj){
+  if(!obj)return'';if(typeof obj==='string')return obj;
+  const nd=obj.name||obj.shortDescription||obj.baseName||obj.nameOfSubType||[];
+  if(typeof nd==='string')return nd;
+  if(Array.isArray(nd)){const v=(nd.find(x=>x['@xml:lang']==='de')||nd.find(x=>x['@xml:lang']==='en')||nd[0]||{});return v.value||v['#text']||v.name||'';}
+  return'';
+}
+
+/* =====================================================
+   INIT
+   ===================================================== */
+['ngfa','dt','bauteilName'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',render);});
+render();
+</script>
+</body>
+</html>
