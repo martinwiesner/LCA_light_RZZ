@@ -157,7 +157,17 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
 .btn-add { padding: 6px 14px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; align-self: flex-end; }
 .btn-add:hover { background: var(--accent2); }
 
-.result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; padding: 13px; }
+.btn-add-obd { padding: 7px 16px; background: var(--green); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.btn-add-obd:hover { background: #0e4a20; }
+.add-modal-geom { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; padding: 14px; border-top: 1px solid var(--border); background: var(--bg); }
+.add-modal-geom .fg label { color: var(--muted); }
+.add-modal-geom .fg input { background: white; width: 100%; }
+.add-modal-actions { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+.btn-confirm-add { padding: 8px 20px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.btn-confirm-add:hover { background: var(--accent2); }
+.btn-confirm-add:disabled { opacity: 0.4; cursor: default; }
+.add-result-preview { padding: 10px 14px; background: var(--green-bg); border-top: 1px solid var(--green-border); font-size: 12px; color: var(--green); display: none; }
+.add-result-preview.visible { display: block; } grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; padding: 13px; }
 .card { border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; border-left-width: 3px; }
 .card .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 5px; }
 .card .val { font-family: var(--mono); font-size: 20px; font-weight: 700; }
@@ -262,93 +272,6 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
       <span id="apiStatus" style="font-size:11px;color:var(--muted)">Verbindung wird geprüft…</span>
     </div>
 
-    <!-- Cloudflare Worker collapsible -->
-    <div class="cf-setup">
-      <div class="cf-setup-header" onclick="toggleCF()">
-        <span class="cf-icon">⚡</span>
-        <div>
-          <div class="cf-title">Cloudflare Worker einrichten — löst alle CORS-Fehler</div>
-          <div class="cf-sub">oekobaudat.de blockiert Proxy-Dienste. Ein eigener Worker in 5 Minuten ist die einzige zuverlässige Lösung.</div>
-        </div>
-        <span class="chevron" id="cfChevron">▾</span>
-      </div>
-
-      <div class="cf-body" id="cfBody">
-        <div class="cf-steps">
-          <div class="cf-step">
-            <div class="cf-step-num">1</div>
-            <h4>Kostenloses Cloudflare-Konto</h4>
-            <p>Gehe zu <a href="https://workers.cloudflare.com" target="_blank">workers.cloudflare.com</a> und erstelle ein kostenloses Konto. Kein Domain-Kauf nötig. Limit: 100.000 Anfragen/Tag.</p>
-          </div>
-          <div class="cf-step">
-            <div class="cf-step-num">2</div>
-            <h4>Neuen Worker anlegen</h4>
-            <p>Dashboard → <strong>Workers & Pages → Create Application → Create Worker</strong>. Namen vergeben (z. B. <code>oebd-proxy</code>), dann <strong>Deploy</strong> klicken.</p>
-          </div>
-          <div class="cf-step">
-            <div class="cf-step-num">3</div>
-            <h4>Worker-Code einfügen</h4>
-            <p>Im Worker-Editor auf <strong>Edit Code</strong> klicken, den gesamten Inhalt löschen und den Code rechts einfügen. Dann <strong>Save &amp; Deploy</strong>.</p>
-          </div>
-          <div class="cf-step">
-            <div class="cf-step-num">4</div>
-            <h4>Worker-URL hier eintragen</h4>
-            <p>Die URL siehst du oben im Worker-Dashboard, z. B.:<br><code>https://oebd-proxy.deinname.workers.dev</code><br>Unten eintragen und auf <strong>Speichern &amp; testen</strong> klicken.</p>
-          </div>
-        </div>
-
-        <!-- Worker code -->
-        <div style="margin-bottom:12px">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Worker Code — komplett kopieren und in den Cloudflare Editor einfügen:</div>
-          <div class="code-block" id="workerCodeBlock">
-<button class="btn-copy" onclick="copyWorkerCode(this)">Kopieren</button><span class="cm">// Ökobaudat CORS Proxy Worker</span>
-<span class="cm">// Deploy auf: workers.cloudflare.com (kostenlos)</span>
-
-<span class="kw">export default</span> {
-  <span class="kw">async</span> <span class="fn">fetch</span>(request, env) {
-    <span class="kw">const</span> url = <span class="kw">new</span> <span class="fn">URL</span>(request.url);
-
-    <span class="cm">// CORS preflight</span>
-    <span class="kw">if</span> (request.method === <span class="str">'OPTIONS'</span>) {
-      <span class="kw">return new</span> <span class="fn">Response</span>(<span class="kw">null</span>, { headers: corsHeaders() });
-    }
-
-    <span class="kw">const</span> target = url.searchParams.<span class="fn">get</span>(<span class="str">'url'</span>);
-    <span class="kw">if</span> (!target || !target.<span class="fn">startsWith</span>(<span class="str">'https://oekobaudat.de/'</span>)) {
-      <span class="kw">return new</span> <span class="fn">Response</span>(<span class="str">'Ungültige URL'</span>, { status: 400 });
-    }
-
-    <span class="kw">const</span> resp = <span class="kw">await</span> <span class="fn">fetch</span>(target, {
-      headers: { <span class="str">'Accept'</span>: <span class="str">'application/json'</span>, <span class="str">'User-Agent'</span>: <span class="str">'BNB-LCA-Tool/1.0'</span> }
-    });
-
-    <span class="kw">const</span> body = <span class="kw">await</span> resp.<span class="fn">text</span>();
-    <span class="kw">return new</span> <span class="fn">Response</span>(body, {
-      status: resp.status,
-      headers: { ...<span class="fn">corsHeaders</span>(), <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> }
-    });
-  }
-};
-
-<span class="kw">function</span> <span class="fn">corsHeaders</span>() {
-  <span class="kw">return</span> {
-    <span class="str">'Access-Control-Allow-Origin'</span>: <span class="str">'*'</span>,
-    <span class="str">'Access-Control-Allow-Methods'</span>: <span class="str">'GET, OPTIONS'</span>,
-    <span class="str">'Access-Control-Allow-Headers'</span>: <span class="str">'*'</span>
-  };
-}</div>
-        </div>
-
-        <!-- Worker URL input -->
-        <div class="worker-url-row">
-          <label>Meine Worker-URL:</label>
-          <input type="text" id="workerUrl" placeholder="https://oebd-proxy.deinname.workers.dev" oninput="saveWorkerUrl()">
-          <button class="btn-save-worker" onclick="testAndSaveWorker()">Speichern &amp; testen</button>
-        </div>
-        <div id="workerTestResult" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
-      </div>
-    </div>
-
   </div>
 
   <!-- Bauteilkatalog -->
@@ -390,6 +313,10 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
       </table>
     </div>
     <div class="add-area">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn-add-obd" onclick="openAddModal()">+ Schicht aus Ökobaudat suchen</button>
+        <span style="font-size:11px;color:var(--muted)">oder manuell:</span>
+      </div>
       <div class="add-form">
         <div class="fg"><label>Schicht</label><input type="text" id="f_sch" placeholder="Bezeichnung"></div>
         <div class="fg"><label>Ökobaudat-Name</label><input type="text" id="f_oko" placeholder="Datensatzname" style="width:165px"></div>
@@ -402,7 +329,7 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
         <div class="fg"><label>Einheit</label>
           <select id="f_eu" style="width:80px"><option value="kg">CO₂/kg</option><option value="m3">CO₂/m³</option></select>
         </div>
-        <button class="btn-add" onclick="addLayer()">+ Schicht hinzufügen</button>
+        <button class="btn-add" onclick="addLayer()">+ Hinzufügen</button>
       </div>
     </div>
     <div class="footnote">
@@ -453,7 +380,38 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
 
 </div>
 
-<!-- Modal -->
+<!-- Add from Ökobaudat Modal -->
+<div class="overlay" id="addOverlay">
+  <div class="search-modal" style="max-width:720px">
+    <div class="modal-head" style="background:var(--green)">
+      <div><h2>Schicht aus Ökobaudat hinzufügen</h2><p id="addModalStep">Schritt 1: Material suchen</p></div>
+      <button class="btn-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-search-row">
+      <input type="text" id="addModalInput" placeholder="Materialname, z. B. Beton, EPS, Holz, Stahl…">
+      <button class="btn-search" id="addBtnSearch" onclick="doAddSearch()">Suchen</button>
+    </div>
+    <div class="modal-body" id="addModalBody">
+      <div class="modal-status">Materialname eingeben und suchen.</div>
+    </div>
+    <!-- Geometry inputs — shown after material selected -->
+    <div class="add-modal-geom" id="addGeomArea" style="display:none">
+      <div class="fg"><label>Schichtname</label><input type="text" id="ag_sch" placeholder="z. B. Außenwand 1.3"></div>
+      <div class="fg"><label>ND [a]</label><input type="number" id="ag_nd" value="50" min="1"></div>
+      <div class="fg"><label>Dicke [mm]</label><input type="number" id="ag_di" value="100" min="0" step="1"></div>
+      <div class="fg"><label>Fläche [m²]</label><input type="number" id="ag_fl" value="1000" min="0"></div>
+      <div class="fg"><label>Rohdichte [kg/m³]</label><input type="number" id="ag_rh" value="1000" min="0" step="1"></div>
+    </div>
+    <div class="add-result-preview" id="addPreview"></div>
+    <div class="add-modal-actions" id="addActions" style="display:none">
+      <button class="btn-confirm-add" id="btnConfirmAdd" onclick="confirmAddLayer()">Schicht hinzufügen</button>
+      <span style="font-size:11px;color:var(--muted)" id="addActionNote"></span>
+      <button style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted)" onclick="closeAddModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit / search existing layer Modal -->
 <div class="overlay" id="overlay">
   <div class="search-modal">
     <div class="modal-head">
@@ -696,8 +654,121 @@ function copyWorkerCode(btn){
 }
 
 /* ======================================================
-   MODAL
+   ADD FROM ÖKOBAUDAT MODAL
    ====================================================== */
+let pendingAdd = null; // { uuid, version, name, gwpH, gwpEoL, unit }
+
+function openAddModal(){
+  pendingAdd = null;
+  document.getElementById('addModalInput').value = '';
+  document.getElementById('addModalBody').innerHTML = '<div class="modal-status">Materialname eingeben und suchen.</div>';
+  document.getElementById('addGeomArea').style.display = 'none';
+  document.getElementById('addActions').style.display = 'none';
+  document.getElementById('addPreview').classList.remove('visible');
+  document.getElementById('addModalStep').textContent = 'Schritt 1: Material suchen';
+  document.getElementById('addOverlay').classList.add('visible');
+  setTimeout(()=>{document.getElementById('addModalInput').focus();},80);
+}
+function closeAddModal(){ document.getElementById('addOverlay').classList.remove('visible'); pendingAdd = null; }
+document.getElementById('addOverlay').addEventListener('click', e=>{ if(e.target.id==='addOverlay') closeAddModal(); });
+document.getElementById('addModalInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doAddSearch(); });
+
+async function doAddSearch(){
+  const q = document.getElementById('addModalInput').value.trim(); if(!q) return;
+  const ds = document.getElementById('dsSelect').value, norm = document.getElementById('normSelect').value;
+  const btn = document.getElementById('addBtnSearch'), body = document.getElementById('addModalBody');
+  btn.disabled=true; btn.textContent='…';
+  body.innerHTML='<div class="modal-status">Suche läuft…</div>';
+  document.getElementById('addGeomArea').style.display='none';
+  document.getElementById('addActions').style.display='none';
+  document.getElementById('addPreview').classList.remove('visible');
+  try{
+    let url=`${BASE}/datastocks/${ds}/processes?search=true&name=${encodeURIComponent(q)}&format=JSON&pageSize=30`;
+    if(norm) url+=`&compliance=${norm}`;
+    const json = await apiFetch(url);
+    const items = json.data||json.processes||[];
+    if(!items.length){ body.innerHTML='<div class="modal-status">Keine Treffer. Anderen Begriff versuchen.</div>'; return; }
+    body.innerHTML = items.map(p=>{
+      const name=getName(p), uuid=p.uuid, ver=p.version||'';
+      const compls=(p.complianceSystems||[]).map(c=>{const cn=getName(c);if(/A2|\+A2/.test(cn))return'<span class="r-badge badge-a2">A2</span>';if(/A1|15804/.test(cn))return'<span class="r-badge badge-a1">A1</span>';return'';}).join('');
+      const cats=(p.classificationInformation?.classification||[]).flatMap(c=>c.classes?.clazz||[]).map(c=>getName(c)||'').filter(Boolean).join(' › ');
+      return`<div class="result-item" onclick="selectAddMaterial('${uuid}','${esc(ver)}','${esc(name)}')">
+        <div class="r-name">${esc(name)}${compls}</div>
+        <div class="r-meta"><span>UUID: ${uuid.slice(0,8)}…</span>${ver?`<span>v${ver}</span>`:''} ${cats?`<span>${esc(cats.slice(0,55))}</span>`:''}</div>
+      </div>`;
+    }).join('');
+  } catch(e){
+    body.innerHTML=`<div class="modal-status" style="color:var(--red)">Fehler: ${e.message}</div>`;
+  } finally { btn.disabled=false; btn.textContent='Suchen'; }
+}
+
+async function selectAddMaterial(uuid, version, name){
+  const body = document.getElementById('addModalBody');
+  body.innerHTML='<div class="modal-status">GWP-Werte werden geladen…</div>';
+  document.getElementById('addGeomArea').style.display='none';
+  document.getElementById('addActions').style.display='none';
+  try{
+    const ds = document.getElementById('dsSelect').value;
+    const vq = version ? `version=${version}&` : '';
+    const dsj = await apiFetch(`${BASE}/datastocks/${ds}/processes/${uuid}?${vq}format=JSON&view=extended`);
+    const res = extractGWP(dsj);
+    const realName = getName(dsj) || name;
+    pendingAdd = { uuid, version, name: realName, gwpH: res.gwpH, gwpEoL: res.gwpEoL, unit: res.unit };
+
+    // Pre-fill geom fields
+    document.getElementById('ag_sch').value = `Schicht ${layers.length+1} – ${realName.slice(0,25)}`;
+    if(res.unit==='m3') { document.getElementById('ag_rh').value = 1000; }
+
+    // Show what was found
+    const hTxt = res.gwpH!==null ? res.gwpH.toFixed(5)+` kg CO₂-Äqu./${res.unit}` : '– (nicht gefunden)';
+    const rTxt = res.gwpEoL!==null ? res.gwpEoL.toFixed(5)+` kg CO₂-Äqu./${res.unit}` : '– (nicht gefunden)';
+    body.innerHTML=`<div style="padding:12px 14px">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">${esc(realName)}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="background:var(--blue-bg);border:1px solid #c5d9f5;border-radius:5px;padding:8px 12px;flex:1">
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px">GWP Herstellung (A1-A3)</div>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--blue)">${hTxt}</div>
+        </div>
+        <div style="background:var(--brown-bg);border:1px solid #f0c8a0;border-radius:5px;padding:8px 12px;flex:1">
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px">GWP EoL (C3+C4)</div>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--brown)">${rTxt}</div>
+        </div>
+      </div>
+    </div>`;
+
+    document.getElementById('addGeomArea').style.display='grid';
+    document.getElementById('addActions').style.display='flex';
+    document.getElementById('addModalStep').textContent='Schritt 2: Maße eingeben und hinzufügen';
+    document.getElementById('addActionNote').textContent = res.gwpH===null ? '⚠ Kein GWP-H gefunden — Faktor bitte manuell prüfen' : '';
+    document.getElementById('ag_sch').focus();
+    document.getElementById('ag_sch').select();
+  } catch(e){
+    body.innerHTML=`<div class="modal-status" style="color:var(--red)">Fehler beim Laden: ${e.message}</div>`;
+  }
+}
+
+function confirmAddLayer(){
+  if(!pendingAdd) return;
+  const sch = document.getElementById('ag_sch').value.trim() || `Schicht ${layers.length+1}`;
+  const nd  = parseFloat(document.getElementById('ag_nd').value)||50;
+  const di  = parseFloat(document.getElementById('ag_di').value)||100;
+  const fl  = parseFloat(document.getElementById('ag_fl').value)||1000;
+  const rh  = parseFloat(document.getElementById('ag_rh').value)||1000;
+  layers.push({
+    id: uid++,
+    sch: `Bauteil ${layers.length+1}.1`,
+    grp: sch,
+    oko: pendingAdd.name,
+    nd, di, fl, rh,
+    gh: pendingAdd.gwpH ?? 0,
+    ge: pendingAdd.gwpEoL ?? 0,
+    vol: pendingAdd.unit === 'm3',
+  });
+  render();
+  closeAddModal();
+}
+
+
 function openModal(layerId){
   activeLayerId=layerId;
   const l=layers.find(x=>x.id===layerId);
