@@ -556,6 +556,7 @@ function addLayer(){
    ====================================================== */
 const CC={h:'rgba(74,144,217,0.85)',e:'rgba(155,89,182,0.85)',r:'rgba(192,98,42,0.85)',hB:'rgba(74,144,217,1)',eB:'rgba(155,89,182,1)',rB:'rgba(192,98,42,1)'};
 function updateCharts(){
+  if (typeof Chart === 'undefined') return;
   const labels=layers.map(l=>l.grp||l.sch),calcs=layers.map(l=>calc(l));
   const gwpH=calcs.map(c=>+c.gwpH.toFixed(3)),gwpE=calcs.map(c=>+c.gwpE.toFixed(3)),gwpR=calcs.map(c=>+c.gwpR.toFixed(3));
   const absData={labels,datasets:[
@@ -754,9 +755,10 @@ function confirmAddLayer(){
   const di  = parseFloat(document.getElementById('ag_di').value)||100;
   const fl  = parseFloat(document.getElementById('ag_fl').value)||1000;
   const rh  = parseFloat(document.getElementById('ag_rh').value)||1000;
+  const idx = layers.length + 1;
   layers.push({
     id: uid++,
-    sch: `Bauteil ${layers.length+1}.1`,
+    sch: `Bauteil ${idx}.1`,
     grp: sch,
     oko: pendingAdd.name,
     nd, di, fl, rh,
@@ -858,7 +860,16 @@ if(workerUrl){
 
 ['ngfa','dt','bauteilName'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',render);});
 checkApi();
-render();
+
+// Wait for Chart.js to be ready before first render
+function initRender() {
+  if (typeof Chart !== 'undefined') {
+    render();
+  } else {
+    setTimeout(initRender, 50);
+  }
+}
+initRender();
 </script>
 </body>
 </html>
