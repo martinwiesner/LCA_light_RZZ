@@ -955,15 +955,59 @@ function buildRowLocationQuery(row){
 function escapeRegex(s){
   return String(s||'').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+const PLACE_STOPWORDS = new Set(['ohne','platten','rohr','boden','train','speicher']);
+const MANUAL_PLACE_ALIASES = [
+  { aliases: ['hoever', 'hover', 'höver'], name: 'Höver', state: 'Niedersachsen', lat: 52.3489, lon: 9.8931, note: 'Ortsteil von Sehnde' },
+  { aliases: ['schwelgern', 'duisburg schwelgern'], name: 'Schwelgern', state: 'Nordrhein-Westfalen', lat: 51.5040, lon: 6.7332, note: 'Ort in Duisburg' },
+  { aliases: ['laegerdorf', 'lägerdorf', 'lagerdorf'], name: 'Lägerdorf', state: 'Schleswig-Holstein', lat: 53.8875, lon: 9.5715, note: 'Gemeinde in Steinburg' }
+];
 function normalizeGermanCityText(v){
   return String(v||'')
     .toLowerCase()
+    .replace(/ae/g,'a')
+    .replace(/oe/g,'o')
+    .replace(/ue/g,'u')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g,'')
     .replace(/ß/g,'ss')
     .replace(/[^a-z0-9]+/g,' ')
     .replace(/\s+/g,' ')
     .trim();
+}
+function shouldIgnorePlaceNorm(norm, text=''){
+  if(!norm) return true;
+  if(PLACE_STOPWORDS.has(norm)) return true;
+  const full = normalizeGermanCityText(text);
+  if(norm === 'damp'){
+    if(/\bdampf/.test(full) || /\bdampfbremse\b/.test(full) || /\bdampfsperre\b/.test(full) || /\bdampfdiffusion\b/.test(full)) return true;
+  }
+  return false;
+}
+function detectManualPlaceAlias(texts){
+  const normalizedTexts = dedupeStrings((texts||[]).map(normalizeGermanCityText).filter(Boolean));
+  if(!normalizedTexts.length) return null;
+  for(const entry of MANUAL_PLACE_ALIASES){
+    const aliasNorms = entry.aliases.map(v => normalizeGermanCityText(v)).filter(Boolean);
+    for(const txt of normalizedTexts){
+      for(const aliasNorm of aliasNorms){
+        if(!aliasNorm || shouldIgnorePlaceNorm(aliasNorm, txt)) continue;
+        const re = new RegExp(`(^|\\b)${escapeRegex(aliasNorm).replace(/ /g,'\\s+')}(\\b|$)`, 'i');
+        if(txt.includes(aliasNorm) && re.test(txt)){
+          return {
+            kind: 'manual-place',
+            name: entry.name,
+            state: entry.state,
+            lat: entry.lat,
+            lon: entry.lon,
+            sourceText: txt,
+            match: entry.name,
+            note: entry.note || ''
+          };
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function detectGermanCityInTexts(texts){
@@ -973,6 +1017,7 @@ function detectGermanCityInTexts(texts){
     if(city.norm.length < 3) continue;
     for(const txt of normalizedTexts){
       if(txt.length < city.norm.length) continue;
+      if(shouldIgnorePlaceNorm(city.norm, txt)) continue;
       if(txt.includes(city.norm) && city.re.test(txt)){
         return {
           kind: 'city',
@@ -991,6 +1036,7 @@ function detectGermanCityInTexts(texts){
 function scoreMunicipalityCandidate(muni, normalizedTexts){
   let score = 0;
   for(const txt of normalizedTexts){
+    if(shouldIgnorePlaceNorm(muni.norm, txt)) continue;
     if(txt === muni.norm) score += 80;
     else if(txt.includes(muni.norm) && muni.re.test(txt)) score += 40;
 
@@ -1034,6 +1080,7 @@ function detectGermanMunicipalityInTexts(texts){
   for(const muni of GERMAN_MUNICIPALITY_INDEX){
     for(const txt of normalizedTexts){
       if(txt.length < muni.norm.length) continue;
+      if(shouldIgnorePlaceNorm(muni.norm, txt)) continue;
       if(txt.includes(muni.norm) && muni.re.test(txt)){
         candidates.push({ muni, txt, score: scoreMunicipalityCandidate(muni, normalizedTexts) });
         break;
@@ -1069,6 +1116,8 @@ function detectGermanPlaceForRow(rowLike){
     rowLike.name,
     rowLike.classPath
   ];
+  const manual = detectManualPlaceAlias(texts);
+  if(manual) return manual;
   const muni = detectGermanMunicipalityInTexts(texts);
   if(muni) return muni;
   return detectGermanCityInTexts(texts);
