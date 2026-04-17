@@ -135,6 +135,27 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
 .chart-legend span::before { content: ''; width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .leg-h::before { background: #4a90d9; } .leg-e::before { background: #9b59b6; } .leg-r::before { background: #c0622a; }
 
+
+
+/* Standortanalyse */
+.scan-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; padding:12px 14px; border-top:1px solid var(--border); }
+.scan-toolbar .fg input { width: 220px; }
+.btn-scan { padding:7px 14px; background: var(--blue); color:white; border:none; border-radius:5px; cursor:pointer; font-size:12px; font-weight:700; }
+.btn-scan:hover { filter: brightness(1.05); }
+.btn-scan:disabled { opacity:.5; cursor:default; }
+.btn-scan.secondary { background: var(--accent); }
+.btn-scan.ghost { background: white; color: var(--text); border:1px solid var(--border); }
+.scan-status { padding: 0 14px 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.scan-results { padding: 0 14px 14px; display:none; }
+.scan-results.visible { display:block; }
+.scan-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin-bottom:10px; }
+.scan-card { border:1px solid var(--border); border-left:3px solid var(--blue); border-radius:5px; padding:10px 12px; background:white; }
+.scan-card .lbl { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:4px; }
+.scan-card .val { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--blue); }
+.scan-examples { border:1px solid var(--border); border-radius:5px; background: var(--bg); padding:10px 12px; font-size:11px; color:var(--text); }
+.scan-examples code { font-family: var(--mono); font-size: 11px; }
+.scan-examples ul { margin:8px 0 0 18px; }
+
 /* Modal */
 .overlay { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.38); align-items: flex-start; justify-content: center; padding: 48px 20px; }
 .overlay.visible { display: flex; }
@@ -211,6 +232,26 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
       <div class="dot" id="apiDot"></div>
       <span id="apiStatus" style="font-size:11px;color:var(--muted)">Verbindung wird geprüft…</span>
     </div>
+
+  </div>
+
+  <!-- Standortanalyse -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Ökobaudat Standortanalyse</span>
+      <span style="font-weight:400;font-size:10px">Prüft pro Datensatz, ob eine Plant-/Produktions-Location im Extended-JSON gefunden wird</span>
+    </div>
+    <div class="scan-toolbar">
+      <div class="fg">
+        <label>Filter (optional)</label>
+        <input type="text" id="scanFilter" placeholder="z. B. Beton, Dämmstoffe, Holz">
+      </div>
+      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan(false)">Gesamten Datenbestand scannen</button>
+      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan(true)">Nur gefilterte Kategorie scannen</button>
+      <button class="btn-scan ghost" id="btnScanStop" onclick="stopLocationScan()" disabled>Stop</button>
+    </div>
+    <div class="scan-status" id="scanStatus">Noch keine Analyse gestartet.</div>
+    <div class="scan-results" id="scanResults"></div>
   </div>
 
   <!-- Bauteilkatalog -->
@@ -722,6 +763,182 @@ function extractGWP(ds){
 function parseModules(res){const out={},raw=res.other?.anies||res.other?.any||res.anies||[];if(Array.isArray(raw)){let cur=null;for(const a of raw){const nm=a.name||a['@name']||'',vl=a.value??a['#text']??'';if(nm==='module'||nm==='Modul'){cur=String(vl).trim();continue;}if((nm==='amount'||nm==='meanAmount'||nm==='')&&cur){out[cur]=parseFloat(vl);cur=null;continue;}if(a.module)out[String(a.module).trim()]=parseFloat(a.value??a.amount??a.meanAmount??0);}}else if(raw&&typeof raw==='object')for(const[k,v]of Object.entries(raw))if(!isNaN(parseFloat(v)))out[k]=parseFloat(v);return out;}
 function sumMods(mods,keys){let s=0,found=false;for(const k of keys)for(const mk of Object.keys(mods))if(mk.replace(/[\s\-+]/g,'').toUpperCase()===k.replace(/[\s\-+]/g,'').toUpperCase()){s+=mods[mk];found=true;}return found?s:null;}
 function getName(obj){if(!obj)return'';if(typeof obj==='string')return obj;const nd=obj.name||obj.shortDescription||obj.baseName||obj.nameOfSubType||[];if(typeof nd==='string')return nd;if(Array.isArray(nd)){const v=(nd.find(x=>x['@xml:lang']==='de')||nd.find(x=>x['@xml:lang']==='en')||nd[0]||{});return v.value||v['#text']||v.name||'';}return'';}
+
+/* ======================================================
+   LOCATION SCAN HELPERS
+   ====================================================== */
+let locationScanToken = 0;
+
+function normText(v){return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function getClassPath(p){
+  return (p.classificationInformation?.classification||[])
+    .flatMap(c=>c.classes?.clazz||[])
+    .map(c=>getName(c)||'')
+    .filter(Boolean)
+    .join(' › ');
+}
+function setScanButtons(running){
+  document.getElementById('btnScanAll').disabled = running;
+  document.getElementById('btnScanFiltered').disabled = running;
+  document.getElementById('btnScanStop').disabled = !running;
+}
+function stopLocationScan(){
+  locationScanToken++;
+  setScanButtons(false);
+  document.getElementById('scanStatus').innerHTML = '<span style="color:var(--amber)">Analyse gestoppt.</span>';
+}
+function renderScanResults(stats){
+  const pct = stats.total ? ((stats.withLocation / stats.total) * 100).toFixed(1) : '0.0';
+  const examples = stats.examples.length
+    ? '<ul>' + stats.examples.map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)} → <strong>${esc(x.location)}</strong></li>`).join('') + '</ul>'
+    : '<div style="color:var(--muted)">Keine Beispieltreffer gefunden.</div>';
+  document.getElementById('scanResults').innerHTML = `
+    <div class="scan-grid">
+      <div class="scan-card"><div class="lbl">Geprüfte Datensätze</div><div class="val">${f(stats.checked,0)}</div></div>
+      <div class="scan-card"><div class="lbl">Mit Plant Location</div><div class="val">${f(stats.withLocation,0)}</div></div>
+      <div class="scan-card"><div class="lbl">Ohne Plant Location</div><div class="val">${f(Math.max(0, stats.checked - stats.withLocation),0)}</div></div>
+      <div class="scan-card"><div class="lbl">Anteil</div><div class="val">${pct}%</div></div>
+    </div>
+    <div class="scan-examples">
+      <div><strong>Scope:</strong> ${esc(stats.scope)}</div>
+      <div><strong>Hinweis:</strong> Gesucht wird primär nach <code>plantLocationText</code> und eng verwandten Location-Feldern im Extended-JSON.</div>
+      <div style="margin-top:8px"><strong>Beispiele mit Treffer:</strong>${examples}</div>
+    </div>`;
+  document.getElementById('scanResults').classList.add('visible');
+}
+function extractPlantLocation(ds){
+  const seen = new WeakSet();
+  const hits = [];
+  const keyRxPrimary = /(plant.?location.?text|locationofproduction|productionsite|plantsite|factorylocation|manufacturinglocation)/i;
+  const keyRxSecondary = /(plant|production|manufactur|factory|site|geograph|location)/i;
+  const strOk = v => {
+    const s = String(v||'').replace(/\s+/g,' ').trim();
+    if(!s || s.length < 2) return '';
+    if(/^https?:/i.test(s)) return '';
+    if(/^[0-9.\-]+$/.test(s)) return '';
+    return s;
+  };
+  function walk(node, path=''){
+    if(!node || typeof node !== 'object') return;
+    if(seen.has(node)) return;
+    seen.add(node);
+    if(Array.isArray(node)){
+      for(const item of node) walk(item, path);
+      return;
+    }
+    for(const [k,v] of Object.entries(node)){
+      const nextPath = path ? path + '.' + k : k;
+      if(typeof v === 'string'){
+        const sv = strOk(v);
+        if(sv && (keyRxPrimary.test(k) || (keyRxPrimary.test(nextPath)) || (keyRxSecondary.test(k) && /[A-Za-zÄÖÜäöü]/.test(sv)))){
+          hits.push({path: nextPath, value: sv, score: keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) ? 4 : 1});
+        }
+      } else if(Array.isArray(v)){
+        for(const item of v){
+          if(item && typeof item === 'object') walk(item, nextPath);
+          else if(typeof item === 'string'){
+            const sv = strOk(item);
+            if(sv && keyRxPrimary.test(nextPath)) hits.push({path: nextPath, value: sv, score: 3});
+          }
+        }
+      } else if(v && typeof v === 'object') {
+        walk(v, nextPath);
+      }
+    }
+  }
+  walk(ds);
+  if(!hits.length) return '';
+  hits.sort((a,b)=> b.score - a.score || a.value.length - b.value.length);
+  return hits[0].value;
+}
+async function fetchProcessSummaries(ds){
+  const pageSizes = [10000, 5000, 2500];
+  let lastErr = null;
+  for(const size of pageSizes){
+    try {
+      const json = await apiFetch(`${BASE}/datastocks/${ds}/processes?format=JSON&pageSize=${size}`);
+      const items = json.data||json.processes||[];
+      if(items.length) return { items, totalCount: json.totalCount ?? items.length, usedPageSize: size };
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Prozessliste konnte nicht geladen werden.');
+}
+async function runLocationScan(useFilter){
+  const myToken = ++locationScanToken;
+  const ds = document.getElementById('dsSelect').value;
+  const filterRaw = document.getElementById('scanFilter').value.trim();
+  const filter = normText(filterRaw);
+  const status = document.getElementById('scanStatus');
+  const results = document.getElementById('scanResults');
+  results.classList.remove('visible');
+  results.innerHTML = '';
+  setScanButtons(true);
+  status.innerHTML = 'Lade Prozessliste…';
+  try {
+    const summary = await fetchProcessSummaries(ds);
+    if(myToken !== locationScanToken) return;
+    let items = summary.items;
+    if(useFilter){
+      if(!filter){
+        setScanButtons(false);
+        status.innerHTML = '<span style="color:var(--amber)">Bitte einen Filter eingeben, z. B. Beton, Dämmstoffe oder Holz.</span>';
+        return;
+      }
+      items = items.filter(p => {
+        const hay = normText(getName(p) + ' ' + getClassPath(p));
+        return hay.includes(filter);
+      });
+    }
+    const totalListed = summary.totalCount || summary.items.length;
+    const scope = useFilter ? `Filter „${filterRaw}“` : 'Gesamter Datenbestand';
+    if(!items.length){
+      setScanButtons(false);
+      status.innerHTML = `<span style="color:var(--amber)">Keine Datensätze für ${esc(scope)} gefunden.</span>`;
+      return;
+    }
+    status.innerHTML = `Prüfe ${f(items.length,0)} Datensätze (${scope})…`;
+    const stats = { total: items.length, checked: 0, withLocation: 0, examples: [], scope };
+    const chunkSize = 8;
+    for(let i=0;i<items.length;i+=chunkSize){
+      if(myToken !== locationScanToken) return;
+      const chunk = items.slice(i, i + chunkSize);
+      const promises = chunk.map(async p => {
+        try {
+          const version = p.version ? `version=${encodeURIComponent(p.version)}&` : '';
+          const dsj = await apiFetch(`${BASE}/datastocks/${ds}/processes/${p.uuid}?${version}format=JSON&view=extended`);
+          const loc = extractPlantLocation(dsj);
+          return { ok:true, p, loc };
+        } catch (e) {
+          return { ok:false, p, error:e };
+        }
+      });
+      const rows = await Promise.all(promises);
+      for(const row of rows){
+        stats.checked += 1;
+        if(row.ok && row.loc){
+          stats.withLocation += 1;
+          if(stats.examples.length < 12){
+            stats.examples.push({ uuid: row.p.uuid, name: getName(row.p) || row.p.uuid, location: row.loc });
+          }
+        }
+      }
+      const pct = stats.checked ? ((stats.withLocation / stats.checked) * 100).toFixed(1) : '0.0';
+      status.innerHTML = `Prüfe ${f(stats.checked,0)} / ${f(stats.total,0)} Datensätze… &nbsp; Treffer: <strong>${f(stats.withLocation,0)}</strong> (${pct}%)`;
+      renderScanResults(stats);
+      await new Promise(r=>setTimeout(r, 0));
+    }
+    setScanButtons(false);
+    let note = '';
+    if(!useFilter && totalListed > summary.items.length){
+      note = ` <span style="color:var(--amber)">Hinweis: API meldet insgesamt ${f(totalListed,0)} Datensätze, geladen wurden aber ${f(summary.items.length,0)}. Dann begrenzt die List-API vermutlich die Seite.</span>`;
+    }
+    status.innerHTML = `<span style="color:var(--green)">Analyse abgeschlossen.</span> ${f(stats.withLocation,0)} von ${f(stats.checked,0)} Datensätzen haben eine erkannte Plant Location.${note}`;
+    renderScanResults(stats);
+  } catch (e) {
+    setScanButtons(false);
+    status.innerHTML = `<span style="color:var(--red)">Fehler bei der Standortanalyse: ${esc(e.message)}</span>`;
+  }
+}
 
 /* ======================================================
    INIT
