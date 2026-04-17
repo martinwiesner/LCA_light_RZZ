@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BNB Ökobilanzrechner 2015 · Ökobaudat API</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -156,6 +158,36 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
 .scan-examples code { font-family: var(--mono); font-size: 11px; }
 .scan-examples ul { margin:8px 0 0 18px; }
 
+
+.scan-toolbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; padding:12px 14px; border-bottom:1px solid var(--border); background:#f9f8f5; }
+.btn-scan { padding:8px 14px; background:var(--accent); color:white; border:none; border-radius:5px; cursor:pointer; font-size:12px; font-weight:600; }
+.btn-scan:hover { background:var(--accent2); }
+.btn-scan.secondary { background:var(--blue); }
+.btn-scan.secondary:hover { filter:brightness(0.95); }
+.btn-scan.strict { background:var(--green); }
+.btn-scan.strict:hover { background:#0e4a20; }
+.btn-scan.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-scan:disabled { opacity:0.5; cursor:default; }
+.scan-status { padding:10px 14px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); }
+.scan-results { display:none; padding:14px; }
+.scan-results.visible { display:block; }
+.scan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:12px; }
+.scan-card { border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:5px; background:white; padding:10px 12px; }
+.scan-card .lbl { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:5px; }
+.scan-card .val { font-family:var(--mono); font-size:22px; font-weight:700; color:var(--accent); }
+.scan-examples { border:1px solid var(--border); border-radius:6px; background:#faf9f7; padding:12px 14px; font-size:12px; line-height:1.6; }
+.scan-examples ul { margin:6px 0 0 18px; }
+.strict-list-wrap { margin-top:14px; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.strict-list-head { padding:10px 14px; background:#f6f4f0; border-bottom:1px solid var(--border); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); }
+.strict-empty { padding:14px; color:var(--muted); font-size:12px; }
+.table-compact { width:100%; border-collapse:collapse; min-width:760px; font-size:12px; }
+.table-compact th, .table-compact td { padding:8px 10px; border-bottom:1px solid #eceae5; text-align:left; vertical-align:top; }
+.table-compact th { background:#fbfaf8; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
+.table-compact td code { font-family:var(--mono); font-size:11px; }
+.map-panel-body { padding:14px; }
+#strictLocationMap { width:100%; height:460px; border:1px solid var(--border); border-radius:6px; background:#eef1f3; }
+.map-note { margin-top:10px; font-size:11px; color:var(--muted); line-height:1.6; }
+
 /* Modal */
 .overlay { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.38); align-items: flex-start; justify-content: center; padding: 48px 20px; }
 .overlay.visible { display: flex; }
@@ -239,20 +271,20 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
   <div class="panel">
     <div class="panel-header">
       <span>Ökobaudat Standortanalyse</span>
-      <span style="font-weight:400;font-size:10px">Prüft pro Datensatz, ob im Extended-JSON eine Plant Location gefunden wird — wahlweise heuristisch oder nur exaktes plantLocationText</span>
+      <span style="font-weight:400;font-size:10px">Prüft pro Datensatz, ob eine Plant-/Produktions-Location im Extended-JSON gefunden wird</span>
     </div>
     <div class="scan-toolbar">
       <div class="fg">
         <label>Filter (optional)</label>
         <input type="text" id="scanFilter" placeholder="z. B. Beton, Dämmstoffe, Holz">
       </div>
-      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan(false, false)">Gesamten Datenbestand scannen</button>
-      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan(true, false)">Nur gefilterte Kategorie scannen</button>
-      <button class="btn-scan secondary" id="btnScanAllStrict" onclick="runLocationScan(false, true)">Nur exaktes plantLocationText scannen</button>
-      <button class="btn-scan secondary" id="btnScanFilteredStrict" onclick="runLocationScan(true, true)">Gefiltert: nur exaktes plantLocationText</button>
+      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan(false)">Gesamten Datenbestand scannen</button>
+      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan(true)">Nur gefilterte Kategorie scannen</button>
+      <button class="btn-scan strict" id="btnScanAllStrict" onclick="runLocationScan(false, true)">Nur exaktes plantLocationText scannen</button>
+      <button class="btn-scan strict" id="btnScanFilteredStrict" onclick="runLocationScan(true, true)">Gefiltert: nur exaktes plantLocationText</button>
       <button class="btn-scan ghost" id="btnScanStop" onclick="stopLocationScan()" disabled>Stop</button>
     </div>
-    <div class="scan-status" id="scanStatus">Noch keine Analyse gestartet. Wähle optional einen Filter und dann Heuristik oder Strict-Scan.</div>
+    <div class="scan-status" id="scanStatus">Noch keine Analyse gestartet.</div>
     <div class="scan-results" id="scanResults"></div>
   </div>
 
@@ -357,6 +389,18 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
         </div>
         <div class="chart-wrap"><canvas id="chartSpec"></canvas></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Karte der strengen plantLocationText-Treffer -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Karte · exaktes plantLocationText</span>
+      <span style="font-weight:400;font-size:10px">Leaflet-Karte für alle strengen Treffer aus der Standortanalyse</span>
+    </div>
+    <div class="map-panel-body">
+      <div id="strictLocationMap"></div>
+      <div class="map-note" id="strictLocationMapNote">Noch keine strengen Treffer vorhanden. Führe zuerst einen strengen Scan aus.</div>
     </div>
   </div>
 
@@ -782,6 +826,10 @@ function getClassPath(p){
 function setScanButtons(running){
   document.getElementById('btnScanAll').disabled = running;
   document.getElementById('btnScanFiltered').disabled = running;
+  const btnAllStrict = document.getElementById('btnScanAllStrict');
+  const btnFilteredStrict = document.getElementById('btnScanFilteredStrict');
+  if(btnAllStrict) btnAllStrict.disabled = running;
+  if(btnFilteredStrict) btnFilteredStrict.disabled = running;
   document.getElementById('btnScanStop').disabled = !running;
 }
 function stopLocationScan(){
@@ -792,8 +840,25 @@ function stopLocationScan(){
 function renderScanResults(stats){
   const pct = stats.total ? ((stats.withLocation / stats.total) * 100).toFixed(1) : '0.0';
   const examples = stats.examples.length
-    ? '<ul>' + stats.examples.map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)} → <strong>${esc(x.location)}</strong>${x.path ? ` <span style="color:var(--muted)">(${esc(x.path)})</span>` : ''}</li>`).join('') + '</ul>'
-    : '<div style="color:var(--muted)">Keine Beispieltreffer gefunden.</div>';
+    ? '<ul>' + stats.examples.map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)} → <strong>${esc(x.location)}</strong>${x.path ? ` <span style="color:var(--muted)">(<code>${esc(x.path)}</code>)</span>` : ''}</li>`).join('') + '</ul>'
+    : '<div style="color:var(--muted)">Keine Beispieltreffer gefunden.</div>' ;
+
+  let strictListHtml = '';
+  if(stats.strictOnly){
+    const rows = (stats.strictMatches||[]).map(x => `
+      <tr>
+        <td><code>${esc(x.uuid)}</code></td>
+        <td>${esc(x.name)}</td>
+        <td><strong>${esc(x.location)}</strong></td>
+        <td><code>${esc(x.path || 'plantLocationText')}</code></td>
+      </tr>`).join('');
+    strictListHtml = `
+      <div class="strict-list-wrap">
+        <div class="strict-list-head">Liste aller Datensätze mit exaktem plantLocationText</div>
+        ${rows ? `<div class="table-wrap"><table class="table-compact"><thead><tr><th>UUID</th><th>Datensatz</th><th>plantLocationText</th><th>JSON-Pfad</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="strict-empty">Keine exakten plantLocationText-Treffer.</div>`}
+      </div>`;
+  }
+
   document.getElementById('scanResults').innerHTML = `
     <div class="scan-grid">
       <div class="scan-card"><div class="lbl">Geprüfte Datensätze</div><div class="val">${f(stats.checked,0)}</div></div>
@@ -803,109 +868,201 @@ function renderScanResults(stats){
     </div>
     <div class="scan-examples">
       <div><strong>Scope:</strong> ${esc(stats.scope)}</div>
-      <div><strong>Hinweis:</strong> Gesucht wird primär nach <code>plantLocationText</code> und eng verwandten Location-Feldern im Extended-JSON.</div>
+      <div><strong>Modus:</strong> ${esc(stats.modeText || (stats.strictOnly ? 'Strict: nur exaktes plantLocationText' : 'Heuristik'))}</div>
+      <div><strong>Hinweis:</strong> ${stats.strictOnly ? 'Gezählt werden nur Felder mit exakt passendem Key <code>plantLocationText</code>.' : 'Gesucht wird primär nach <code>plantLocationText</code> und eng verwandten Location-Feldern im Extended-JSON.'}</div>
       <div style="margin-top:8px"><strong>Beispiele mit Treffer:</strong>${examples}</div>
-    </div>`;
+    </div>
+    ${strictListHtml}`;
   document.getElementById('scanResults').classList.add('visible');
-}
-function extractStrictPlantLocationInfo(ds){
-  const seen = new WeakSet();
-  const results = [];
-
-  function walk(node, path){
-    if(node === null || node === undefined) return;
-    if(typeof node === 'string'){
-      return;
-    }
-    if(typeof node !== 'object') return;
-    if(seen.has(node)) return;
-    seen.add(node);
-
-    if(Array.isArray(node)) {
-      node.forEach((item, idx) => walk(item, `${path}[${idx}]`));
-      return;
-    }
-
-    for(const [key, value] of Object.entries(node)){
-      const nextPath = path ? `${path}.${key}` : key;
-      if(key === 'plantLocationText'){
-        const raw = Array.isArray(value)
-          ? value.map(v => typeof v === 'string' ? v : (v?.value ?? v?.['#text'] ?? '')).filter(Boolean).join(' | ')
-          : (typeof value === 'string' ? value : (value?.value ?? value?.['#text'] ?? ''));
-        const cleaned = String(raw || '').trim();
-        if(cleaned) results.push({ value: cleaned, path: nextPath });
-      }
-      walk(value, nextPath);
-    }
-  }
-
-  walk(ds, '');
-  return results[0] || null;
+  renderStrictLocationMap(stats.strictOnly ? (stats.strictMatches || []) : []);
 }
 
 function extractPlantLocationInfo(ds){
-  const strict = extractStrictPlantLocationInfo(ds);
-  if(strict) return strict;
-  const patterns = [
-    /plantlocation/i,
-    /productionlocation/i,
-    /manufacturinglocation/i,
-    /geographicrepresentativeness/i,
-    /location/i,
-    /country/i,
-    /region/i
-  ];
-  const skip = /(latitude|longitude|geo.?reference|locationtype|validlocation|substitutionlocation)/i;
-  const seen = new WeakSet();
-  const hits = [];
-
-  function normalizeVal(value){
-    if(value === null || value === undefined) return '';
-    if(typeof value === 'string') return value.trim();
-    if(typeof value === 'number') return String(value);
-    if(Array.isArray(value)){
-      return value.map(v => normalizeVal(v)).filter(Boolean).join(' | ');
-    }
-    if(typeof value === 'object'){
-      if(typeof value.value === 'string') return value.value.trim();
-      if(typeof value['#text'] === 'string') return value['#text'].trim();
-      if(typeof value.shortDescription === 'string') return value.shortDescription.trim();
-      if(Array.isArray(value.shortDescription)){
-        return value.shortDescription.map(v => normalizeVal(v)).filter(Boolean).join(' | ');
-      }
-    }
-    return '';
-  }
-
-  function walk(node, path){
-    if(node === null || node === undefined) return;
-    if(typeof node !== 'object') return;
-    if(seen.has(node)) return;
-    seen.add(node);
-
-    if(Array.isArray(node)) {
-      node.forEach((item, idx) => walk(item, `${path}[${idx}]`));
-      return;
-    }
-
-    for(const [key, value] of Object.entries(node)){
-      const nextPath = path ? `${path}.${key}` : key;
-      if(patterns.some(rx => rx.test(key)) && !skip.test(key)){
-        const normalized = normalizeVal(value);
-        if(normalized && /[A-Za-zÄÖÜäöü]|(DE|AT|CH|EU|GLO)/.test(normalized)){
-          hits.push({ value: normalized, path: nextPath });
-        }
-      }
-      walk(value, nextPath);
-    }
-  }
-
-  walk(ds, '');
-  return hits[0] || null;
+  const exact = extractExactPlantLocationText(ds);
+  if(exact) return exact;
+  const fallback = extractPlantLocation(ds);
+  return fallback ? { value: fallback, path: 'heuristic match' } : null;
 }
 
-function extractPlantLocation(ds, strictOnly=false){
-  return (strictOnly ? extractStrictPlantLocationInfo(ds) : extractPlantLocationInfo(ds))?.value || '';
+function extractExactPlantLocationText(ds){
+  const seen = new WeakSet();
+  let found = null;
+  const clean = v => {
+    const s = String(v ?? '').replace(/\s+/g,' ').trim();
+    if(!s || /^https?:/i.test(s) || /^[0-9.\-]+$/.test(s)) return '';
+    return s;
+  };
+  function walk(node, path=''){
+    if(found || !node || typeof node !== 'object') return;
+    if(seen.has(node)) return;
+    seen.add(node);
+    if(Array.isArray(node)){
+      for(let i=0;i<node.length;i++){
+        walk(node[i], path ? `${path}[${i}]` : `[${i}]`);
+        if(found) return;
+      }
+      return;
+    }
+    for(const [k,v] of Object.entries(node)){
+      const nextPath = path ? `${path}.${k}` : k;
+      if(k === 'plantLocationText'){
+        if(typeof v === 'string'){
+          const s = clean(v);
+          if(s){ found = { value: s, path: nextPath }; return; }
+        } else if(Array.isArray(v)){
+          for(let i=0;i<v.length;i++){
+            const item = v[i];
+            if(typeof item === 'string'){
+              const s = clean(item);
+              if(s){ found = { value: s, path: `${nextPath}[${i}]` }; return; }
+            } else if(item && typeof item === 'object'){
+              const cand = clean(item.value ?? item['#text'] ?? item.name ?? '');
+              if(cand){ found = { value: cand, path: `${nextPath}[${i}]` }; return; }
+            }
+          }
+        } else if(v && typeof v === 'object'){
+          const cand = clean(v.value ?? v['#text'] ?? v.name ?? '');
+          if(cand){ found = { value: cand, path: nextPath }; return; }
+        }
+      }
+      if(v && typeof v === 'object') walk(v, nextPath);
+      if(found) return;
+    }
+  }
+  walk(ds);
+  return found;
+}
+
+let strictMap = null;
+let strictMapLayer = null;
+
+function getLocationLatLng(raw){
+  const s = String(raw || '').trim();
+  if(!s) return null;
+  const key = s.toUpperCase();
+  const map = {
+    'DE':[51.1657,10.4515], 'DEUTSCHLAND':[51.1657,10.4515], 'GERMANY':[51.1657,10.4515],
+    'AT':[47.5162,14.5501], 'ÖSTERREICH':[47.5162,14.5501], 'AUSTRIA':[47.5162,14.5501],
+    'CH':[46.8182,8.2275], 'SCHWEIZ':[46.8182,8.2275], 'SWITZERLAND':[46.8182,8.2275],
+    'EU':[54.5260,15.2551], 'EUROPA':[54.5260,15.2551], 'EUROPE':[54.5260,15.2551],
+    'FR':[46.2276,2.2137], 'FRANKREICH':[46.2276,2.2137], 'FRANCE':[46.2276,2.2137],
+    'IT':[41.8719,12.5674], 'ITALIEN':[41.8719,12.5674], 'ITALY':[41.8719,12.5674],
+    'BE':[50.5039,4.4699], 'BELGIEN':[50.5039,4.4699], 'BELGIUM':[50.5039,4.4699],
+    'NL':[52.1326,5.2913], 'NIEDERLANDE':[52.1326,5.2913], 'NETHERLANDS':[52.1326,5.2913],
+    'DK':[56.2639,9.5018], 'DÄNEMARK':[56.2639,9.5018], 'DENMARK':[56.2639,9.5018],
+    'SE':[60.1282,18.6435], 'SCHWEDEN':[60.1282,18.6435], 'SWEDEN':[60.1282,18.6435],
+    'NO':[60.4720,8.4689], 'NORWEGEN':[60.4720,8.4689], 'NORWAY':[60.4720,8.4689],
+    'FI':[61.9241,25.7482], 'FINNLAND':[61.9241,25.7482], 'FINLAND':[61.9241,25.7482],
+    'PL':[51.9194,19.1451], 'POLEN':[51.9194,19.1451], 'POLAND':[51.9194,19.1451],
+    'CZ':[49.8175,15.4730], 'TSCHECHIEN':[49.8175,15.4730], 'CZECH REPUBLIC':[49.8175,15.4730],
+    'ES':[40.4637,-3.7492], 'SPANIEN':[40.4637,-3.7492], 'SPAIN':[40.4637,-3.7492],
+    'PT':[39.3999,-8.2245], 'PORTUGAL':[39.3999,-8.2245],
+    'UK':[55.3781,-3.4360], 'GB':[55.3781,-3.4360], 'UNITED KINGDOM':[55.3781,-3.4360],
+    'GLO':[20,0], 'GLOBAL':[20,0], 'WORLD':[20,0]
+  };
+  if(map[key]) return map[key];
+  const cc = s.match(/([A-Z]{2})/);
+  if(cc && map[cc[1]]) return map[cc[1]];
+  const parts = s.split(/[;,/]|\s-\s/).map(x=>x.trim()).filter(Boolean);
+  for(const part of parts){
+    const pk = part.toUpperCase();
+    if(map[pk]) return map[pk];
+  }
+  return null;
+}
+
+function renderStrictLocationMap(entries){
+  const noteEl = document.getElementById('strictLocationMapNote');
+  const mapEl = document.getElementById('strictLocationMap');
+  if(!mapEl || typeof L === 'undefined') return;
+  if(!strictMap){
+    strictMap = L.map('strictLocationMap');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(strictMap);
+    strictMap.setView([51.2, 10.4], 4);
+  }
+  if(strictMapLayer){
+    strictMap.removeLayer(strictMapLayer);
+    strictMapLayer = null;
+  }
+  const groups = new Map();
+  for(const entry of entries || []){
+    const coords = getLocationLatLng(entry.location);
+    if(!coords) continue;
+    const key = `${coords[0].toFixed(4)},${coords[1].toFixed(4)}|${entry.location}`;
+    if(!groups.has(key)) groups.set(key, { coords, location: entry.location, items: [] });
+    groups.get(key).items.push(entry);
+  }
+  const vals = Array.from(groups.values());
+  if(!vals.length){
+    noteEl.textContent = entries && entries.length ? 'Für die strengen Treffer wurden plantLocationText-Werte gefunden, aber derzeit nur bekannte Länder-/Regionscodes auf der Karte verortet.' : 'Noch keine strengen Treffer vorhanden. Führe zuerst einen strengen Scan aus.';
+    strictMap.setView([51.2, 10.4], 4);
+    setTimeout(() => strictMap.invalidateSize(), 0);
+    return;
+  }
+  strictMapLayer = L.layerGroup();
+  const bounds = [];
+  for(const group of vals){
+    const marker = L.circleMarker(group.coords, { radius: Math.min(18, 7 + Math.log2(group.items.length + 1) * 3), weight: 2, color: '#0c3d3d', fillColor: '#27ae75', fillOpacity: 0.75 });
+    const list = group.items.slice(0, 20).map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)}</li>`).join('');
+    const more = group.items.length > 20 ? `<div style="margin-top:6px;color:#6b6860;font-size:11px">+ ${group.items.length - 20} weitere</div>` : '';
+    marker.bindPopup(`<div style="min-width:240px"><strong>${esc(group.location)}</strong><div style="margin:4px 0 8px;color:#6b6860">${group.items.length} Datensatz${group.items.length===1?'':'e'}</div><ul style="margin:0 0 0 18px;padding:0">${list}</ul>${more}</div>`);
+    marker.addTo(strictMapLayer);
+    bounds.push(group.coords);
+  }
+  strictMapLayer.addTo(strictMap);
+  if(bounds.length === 1) strictMap.setView(bounds[0], 5);
+  else strictMap.fitBounds(bounds, { padding:[24,24] });
+  noteEl.textContent = `${entries.length} strenge Treffer, davon ${vals.reduce((a,x)=>a+x.items.length,0)} in der Karte verortet. Mehrfachtreffer pro Ort werden aggregiert.`;
+  setTimeout(() => strictMap.invalidateSize(), 0);
+}
+
+function extractPlantLocation(ds){
+  const seen = new WeakSet();
+  const hits = [];
+  const keyRxPrimary = /(plant.?location.?text|locationofproduction|productionsite|plantsite|factorylocation|manufacturinglocation)/i;
+  const keyRxSecondary = /(plant|production|manufactur|factory|site|geograph|location)/i;
+  const strOk = v => {
+    const s = String(v||'').replace(/\s+/g,' ').trim();
+    if(!s || s.length < 2) return '';
+    if(/^https?:/i.test(s)) return '';
+    if(/^[0-9.\-]+$/.test(s)) return '';
+    return s;
+  };
+  function walk(node, path=''){
+    if(!node || typeof node !== 'object') return;
+    if(seen.has(node)) return;
+    seen.add(node);
+    if(Array.isArray(node)){
+      for(const item of node) walk(item, path);
+      return;
+    }
+    for(const [k,v] of Object.entries(node)){
+      const nextPath = path ? path + '.' + k : k;
+      if(typeof v === 'string'){
+        const sv = strOk(v);
+        if(sv && (keyRxPrimary.test(k) || (keyRxPrimary.test(nextPath)) || (keyRxSecondary.test(k) && /[A-Za-zÄÖÜäöü]/.test(sv)))){
+          hits.push({path: nextPath, value: sv, score: keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) ? 4 : 1});
+        }
+      } else if(Array.isArray(v)){
+        for(const item of v){
+          if(item && typeof item === 'object') walk(item, nextPath);
+          else if(typeof item === 'string'){
+            const sv = strOk(item);
+            if(sv && keyRxPrimary.test(nextPath)) hits.push({path: nextPath, value: sv, score: 3});
+          }
+        }
+      } else if(v && typeof v === 'object') {
+        walk(v, nextPath);
+      }
+    }
+  }
+  walk(ds);
+  if(!hits.length) return '';
+  hits.sort((a,b)=> b.score - a.score || a.value.length - b.value.length);
+  return hits[0].value;
 }
 async function fetchProcessSummaries(ds){
   const pageSizes = [10000, 5000, 2500];
@@ -919,7 +1076,7 @@ async function fetchProcessSummaries(ds){
   }
   throw lastErr || new Error('Prozessliste konnte nicht geladen werden.');
 }
-async function runLocationScan(useFilter, strictOnly = false){
+async function runLocationScan(useFilter, strictOnly=false){
   const myToken = ++locationScanToken;
   const ds = document.getElementById('dsSelect').value;
   const filterRaw = document.getElementById('scanFilter').value.trim();
@@ -947,13 +1104,14 @@ async function runLocationScan(useFilter, strictOnly = false){
     }
     const totalListed = summary.totalCount || summary.items.length;
     const scope = useFilter ? `Filter „${filterRaw}“` : 'Gesamter Datenbestand';
+    const modeText = strictOnly ? 'Strict: nur exaktes plantLocationText' : 'Heuristik';
     if(!items.length){
       setScanButtons(false);
       status.innerHTML = `<span style="color:var(--amber)">Keine Datensätze für ${esc(scope)} gefunden.</span>`;
       return;
     }
     status.innerHTML = `Prüfe ${f(items.length,0)} Datensätze (${scope})…`;
-    const stats = { total: items.length, checked: 0, withLocation: 0, examples: [], scope, strictOnly };
+    const stats = { total: items.length, checked: 0, withLocation: 0, examples: [], strictMatches: [], scope, strictOnly, modeText };
     const chunkSize = 8;
     for(let i=0;i<items.length;i+=chunkSize){
       if(myToken !== locationScanToken) return;
@@ -962,8 +1120,8 @@ async function runLocationScan(useFilter, strictOnly = false){
         try {
           const version = p.version ? `version=${encodeURIComponent(p.version)}&` : '';
           const dsj = await apiFetch(`${BASE}/datastocks/${ds}/processes/${p.uuid}?${version}format=JSON&view=extended`);
-          const loc = extractPlantLocation(dsj);
-          return { ok:true, p, loc };
+          const hit = strictOnly ? extractExactPlantLocationText(dsj) : extractPlantLocationInfo(dsj);
+          return { ok:true, p, hit };
         } catch (e) {
           return { ok:false, p, error:e };
         }
@@ -971,16 +1129,18 @@ async function runLocationScan(useFilter, strictOnly = false){
       const rows = await Promise.all(promises);
       for(const row of rows){
         stats.checked += 1;
-        if(row.ok && row.loc){
+        if(row.ok && row.hit && row.hit.value){
           stats.withLocation += 1;
-          if(stats.examples.length < 12){
-            stats.examples.push({ uuid: row.p.uuid, name: getName(row.p) || row.p.uuid, location: row.loc });
-          }
+          const entry = { uuid: row.p.uuid, name: getName(row.p) || row.p.uuid, location: row.hit.value, path: row.hit.path || '' };
+          if(stats.examples.length < 12) stats.examples.push(entry);
+          if(strictOnly) stats.strictMatches.push(entry);
         }
       }
+      if(strictOnly){
+        stats.strictMatches.sort((a,b) => a.name.localeCompare(b.name, 'de'));
+      }
       const pct = stats.checked ? ((stats.withLocation / stats.checked) * 100).toFixed(1) : '0.0';
-      const modeText = strictOnly ? 'Strict: plantLocationText' : 'Heuristik';
-      status.innerHTML = `Prüfe ${f(stats.checked,0)} / ${f(stats.total,0)} Datensätze… &nbsp; Treffer: <strong>${f(stats.withLocation,0)}</strong> (${pct}%) &nbsp; <span style="color:var(--muted)">${modeText}</span>`;
+      status.innerHTML = `Prüfe ${f(stats.checked,0)} / ${f(stats.total,0)} Datensätze… &nbsp; Treffer: <strong>${f(stats.withLocation,0)}</strong> (${pct}%)`;
       renderScanResults(stats);
       await new Promise(r=>setTimeout(r, 0));
     }
