@@ -239,18 +239,20 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
   <div class="panel">
     <div class="panel-header">
       <span>Ökobaudat Standortanalyse</span>
-      <span style="font-weight:400;font-size:10px">Prüft pro Datensatz, ob eine Plant-/Produktions-Location im Extended-JSON gefunden wird</span>
+      <span style="font-weight:400;font-size:10px">Prüft pro Datensatz, ob im Extended-JSON eine Plant Location gefunden wird — wahlweise heuristisch oder nur exaktes plantLocationText</span>
     </div>
     <div class="scan-toolbar">
       <div class="fg">
         <label>Filter (optional)</label>
         <input type="text" id="scanFilter" placeholder="z. B. Beton, Dämmstoffe, Holz">
       </div>
-      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan(false)">Gesamten Datenbestand scannen</button>
-      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan(true)">Nur gefilterte Kategorie scannen</button>
+      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan(false, false)">Gesamten Datenbestand scannen</button>
+      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan(true, false)">Nur gefilterte Kategorie scannen</button>
+      <button class="btn-scan secondary" id="btnScanAllStrict" onclick="runLocationScan(false, true)">Nur exaktes plantLocationText scannen</button>
+      <button class="btn-scan secondary" id="btnScanFilteredStrict" onclick="runLocationScan(true, true)">Gefiltert: nur exaktes plantLocationText</button>
       <button class="btn-scan ghost" id="btnScanStop" onclick="stopLocationScan()" disabled>Stop</button>
     </div>
-    <div class="scan-status" id="scanStatus">Noch keine Analyse gestartet.</div>
+    <div class="scan-status" id="scanStatus">Noch keine Analyse gestartet. Wähle optional einen Filter und dann Heuristik oder Strict-Scan.</div>
     <div class="scan-results" id="scanResults"></div>
   </div>
 
@@ -806,53 +808,104 @@ function renderScanResults(stats){
     </div>`;
   document.getElementById('scanResults').classList.add('visible');
 }
-function extractPlantLocationInfo(ds){
+function extractStrictPlantLocationInfo(ds){
   const seen = new WeakSet();
-  const hits = [];
-  const keyRxPrimary = /(plant.?location.?text|locationofproduction|productionsite|plantsite|factorylocation|manufacturinglocation)/i;
-  const keyRxSecondary = /(plant|production|manufactur|factory|site|geograph|location)/i;
-  const strOk = v => {
-    const s = String(v||'').replace(/\s+/g,' ').trim();
-    if(!s || s.length < 2) return '';
-    if(/^https?:/i.test(s)) return '';
-    if(/^[0-9.\-]+$/.test(s)) return '';
-    return s;
-  };
-  function walk(node, path=''){
-    if(!node || typeof node !== 'object') return;
-    if(seen.has(node)) return;
-    seen.add(node);
-    if(Array.isArray(node)){
-      for(const item of node) walk(item, path);
+  const results = [];
+
+  function walk(node, path){
+    if(node === null || node === undefined) return;
+    if(typeof node === 'string'){
       return;
     }
-    for(const [k,v] of Object.entries(node)){
-      const nextPath = path ? path + '.' + k : k;
-      if(typeof v === 'string'){
-        const sv = strOk(v);
-        if(sv && (keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) || (keyRxSecondary.test(k) && /[A-Za-zÄÖÜäöü]/.test(sv)))){
-          hits.push({path: nextPath, value: sv, score: keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) ? 4 : 1});
-        }
-      } else if(Array.isArray(v)){
-        for(const item of v){
-          if(item && typeof item === 'object') walk(item, nextPath);
-          else if(typeof item === 'string'){
-            const sv = strOk(item);
-            if(sv && keyRxPrimary.test(nextPath)) hits.push({path: nextPath, value: sv, score: 3});
-          }
-        }
-      } else if(v && typeof v === 'object') {
-        walk(v, nextPath);
+    if(typeof node !== 'object') return;
+    if(seen.has(node)) return;
+    seen.add(node);
+
+    if(Array.isArray(node)) {
+      node.forEach((item, idx) => walk(item, `${path}[${idx}]`));
+      return;
+    }
+
+    for(const [key, value] of Object.entries(node)){
+      const nextPath = path ? `${path}.${key}` : key;
+      if(key === 'plantLocationText'){
+        const raw = Array.isArray(value)
+          ? value.map(v => typeof v === 'string' ? v : (v?.value ?? v?.['#text'] ?? '')).filter(Boolean).join(' | ')
+          : (typeof value === 'string' ? value : (value?.value ?? value?.['#text'] ?? ''));
+        const cleaned = String(raw || '').trim();
+        if(cleaned) results.push({ value: cleaned, path: nextPath });
       }
+      walk(value, nextPath);
     }
   }
-  walk(ds);
-  if(!hits.length) return null;
-  hits.sort((a,b)=> b.score - a.score || a.value.length - b.value.length);
-  return hits[0];
+
+  walk(ds, '');
+  return results[0] || null;
 }
-function extractPlantLocation(ds){
-  return extractPlantLocationInfo(ds)?.value || '';
+
+function extractPlantLocationInfo(ds){
+  const strict = extractStrictPlantLocationInfo(ds);
+  if(strict) return strict;
+  const patterns = [
+    /plantlocation/i,
+    /productionlocation/i,
+    /manufacturinglocation/i,
+    /geographicrepresentativeness/i,
+    /location/i,
+    /country/i,
+    /region/i
+  ];
+  const skip = /(latitude|longitude|geo.?reference|locationtype|validlocation|substitutionlocation)/i;
+  const seen = new WeakSet();
+  const hits = [];
+
+  function normalizeVal(value){
+    if(value === null || value === undefined) return '';
+    if(typeof value === 'string') return value.trim();
+    if(typeof value === 'number') return String(value);
+    if(Array.isArray(value)){
+      return value.map(v => normalizeVal(v)).filter(Boolean).join(' | ');
+    }
+    if(typeof value === 'object'){
+      if(typeof value.value === 'string') return value.value.trim();
+      if(typeof value['#text'] === 'string') return value['#text'].trim();
+      if(typeof value.shortDescription === 'string') return value.shortDescription.trim();
+      if(Array.isArray(value.shortDescription)){
+        return value.shortDescription.map(v => normalizeVal(v)).filter(Boolean).join(' | ');
+      }
+    }
+    return '';
+  }
+
+  function walk(node, path){
+    if(node === null || node === undefined) return;
+    if(typeof node !== 'object') return;
+    if(seen.has(node)) return;
+    seen.add(node);
+
+    if(Array.isArray(node)) {
+      node.forEach((item, idx) => walk(item, `${path}[${idx}]`));
+      return;
+    }
+
+    for(const [key, value] of Object.entries(node)){
+      const nextPath = path ? `${path}.${key}` : key;
+      if(patterns.some(rx => rx.test(key)) && !skip.test(key)){
+        const normalized = normalizeVal(value);
+        if(normalized && /[A-Za-zÄÖÜäöü]|(DE|AT|CH|EU|GLO)/.test(normalized)){
+          hits.push({ value: normalized, path: nextPath });
+        }
+      }
+      walk(value, nextPath);
+    }
+  }
+
+  walk(ds, '');
+  return hits[0] || null;
+}
+
+function extractPlantLocation(ds, strictOnly=false){
+  return (strictOnly ? extractStrictPlantLocationInfo(ds) : extractPlantLocationInfo(ds))?.value || '';
 }
 async function fetchProcessSummaries(ds){
   const pageSizes = [10000, 5000, 2500];
@@ -866,7 +919,7 @@ async function fetchProcessSummaries(ds){
   }
   throw lastErr || new Error('Prozessliste konnte nicht geladen werden.');
 }
-async function runLocationScan(useFilter){
+async function runLocationScan(useFilter, strictOnly = false){
   const myToken = ++locationScanToken;
   const ds = document.getElementById('dsSelect').value;
   const filterRaw = document.getElementById('scanFilter').value.trim();
@@ -900,7 +953,7 @@ async function runLocationScan(useFilter){
       return;
     }
     status.innerHTML = `Prüfe ${f(items.length,0)} Datensätze (${scope})…`;
-    const stats = { total: items.length, checked: 0, withLocation: 0, examples: [], scope };
+    const stats = { total: items.length, checked: 0, withLocation: 0, examples: [], scope, strictOnly };
     const chunkSize = 8;
     for(let i=0;i<items.length;i+=chunkSize){
       if(myToken !== locationScanToken) return;
@@ -926,7 +979,8 @@ async function runLocationScan(useFilter){
         }
       }
       const pct = stats.checked ? ((stats.withLocation / stats.checked) * 100).toFixed(1) : '0.0';
-      status.innerHTML = `Prüfe ${f(stats.checked,0)} / ${f(stats.total,0)} Datensätze… &nbsp; Treffer: <strong>${f(stats.withLocation,0)}</strong> (${pct}%)`;
+      const modeText = strictOnly ? 'Strict: plantLocationText' : 'Heuristik';
+      status.innerHTML = `Prüfe ${f(stats.checked,0)} / ${f(stats.total,0)} Datensätze… &nbsp; Treffer: <strong>${f(stats.withLocation,0)}</strong> (${pct}%) &nbsp; <span style="color:var(--muted)">${modeText}</span>`;
       renderScanResults(stats);
       await new Promise(r=>setTimeout(r, 0));
     }
@@ -935,7 +989,7 @@ async function runLocationScan(useFilter){
     if(!useFilter && totalListed > summary.items.length){
       note = ` <span style="color:var(--amber)">Hinweis: API meldet insgesamt ${f(totalListed,0)} Datensätze, geladen wurden aber ${f(summary.items.length,0)}. Dann begrenzt die List-API vermutlich die Seite.</span>`;
     }
-    status.innerHTML = `<span style="color:var(--green)">Analyse abgeschlossen.</span> ${f(stats.withLocation,0)} von ${f(stats.checked,0)} Datensätzen haben eine erkannte Plant Location.${note}`;
+    status.innerHTML = `<span style="color:var(--green)">Analyse abgeschlossen.</span> ${f(stats.withLocation,0)} von ${f(stats.checked,0)} Datensätzen haben ${strictOnly ? 'ein exaktes <code>plantLocationText</code>' : 'eine erkannte Plant Location'}.${note}`;
     renderScanResults(stats);
   } catch (e) {
     setScanButtons(false);
