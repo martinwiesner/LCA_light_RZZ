@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BNB Ökobilanzrechner 2015 · Ökobaudat API</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -125,6 +125,24 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
 .formula-line strong { color: var(--text); }
 .footnote { padding: 7px 14px; border-top: 1px solid var(--border); background: var(--bg); font-size: 10px; color: var(--muted); line-height: 1.6; }
 
+
+.scan-mode { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.scan-list-wrap { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.scan-list-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+.scan-list-head h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.scan-list-note { font-size: 11px; color: var(--muted); }
+.scan-table-wrap { overflow:auto; border:1px solid var(--border); border-radius:6px; background:white; }
+table.scan-table { width:100%; border-collapse: collapse; min-width: 880px; font-size: 12px; }
+table.scan-table th, table.scan-table td { padding: 8px 10px; border-bottom:1px solid #eceae5; vertical-align: top; text-align:left; }
+table.scan-table th { background:#f6f4f0; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); position: sticky; top: 0; z-index: 1; }
+table.scan-table td code { font-family: var(--mono); font-size: 11px; }
+.scan-pill { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--border); font-size:10px; color:var(--muted); font-weight:700; }
+.map-wrap { margin-top: 14px; border-top:1px solid var(--border); padding-top:14px; }
+.map-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+.map-head h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.map-note { font-size:11px; color:var(--muted); }
+#locationMap { height: 420px; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:#eae7e0; }
+
 /* Charts */
 .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
@@ -157,36 +175,6 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
 .scan-examples { border:1px solid var(--border); border-radius:5px; background: var(--bg); padding:10px 12px; font-size:11px; color:var(--text); }
 .scan-examples code { font-family: var(--mono); font-size: 11px; }
 .scan-examples ul { margin:8px 0 0 18px; }
-
-
-.scan-toolbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; padding:12px 14px; border-bottom:1px solid var(--border); background:#f9f8f5; }
-.btn-scan { padding:8px 14px; background:var(--accent); color:white; border:none; border-radius:5px; cursor:pointer; font-size:12px; font-weight:600; }
-.btn-scan:hover { background:var(--accent2); }
-.btn-scan.secondary { background:var(--blue); }
-.btn-scan.secondary:hover { filter:brightness(0.95); }
-.btn-scan.strict { background:var(--green); }
-.btn-scan.strict:hover { background:#0e4a20; }
-.btn-scan.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
-.btn-scan:disabled { opacity:0.5; cursor:default; }
-.scan-status { padding:10px 14px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); }
-.scan-results { display:none; padding:14px; }
-.scan-results.visible { display:block; }
-.scan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:12px; }
-.scan-card { border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:5px; background:white; padding:10px 12px; }
-.scan-card .lbl { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:5px; }
-.scan-card .val { font-family:var(--mono); font-size:22px; font-weight:700; color:var(--accent); }
-.scan-examples { border:1px solid var(--border); border-radius:6px; background:#faf9f7; padding:12px 14px; font-size:12px; line-height:1.6; }
-.scan-examples ul { margin:6px 0 0 18px; }
-.strict-list-wrap { margin-top:14px; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
-.strict-list-head { padding:10px 14px; background:#f6f4f0; border-bottom:1px solid var(--border); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); }
-.strict-empty { padding:14px; color:var(--muted); font-size:12px; }
-.table-compact { width:100%; border-collapse:collapse; min-width:760px; font-size:12px; }
-.table-compact th, .table-compact td { padding:8px 10px; border-bottom:1px solid #eceae5; text-align:left; vertical-align:top; }
-.table-compact th { background:#fbfaf8; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); }
-.table-compact td code { font-family:var(--mono); font-size:11px; }
-.map-panel-body { padding:14px; }
-#strictLocationMap { width:100%; height:460px; border:1px solid var(--border); border-radius:6px; background:#eef1f3; }
-.map-note { margin-top:10px; font-size:11px; color:var(--muted); line-height:1.6; }
 
 /* Modal */
 .overlay { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.38); align-items: flex-start; justify-content: center; padding: 48px 20px; }
@@ -278,14 +266,28 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
         <label>Filter (optional)</label>
         <input type="text" id="scanFilter" placeholder="z. B. Beton, Dämmstoffe, Holz">
       </div>
-      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan(false)">Gesamten Datenbestand scannen</button>
-      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan(true)">Nur gefilterte Kategorie scannen</button>
-      <button class="btn-scan strict" id="btnScanAllStrict" onclick="runLocationScan(false, true)">Nur exaktes plantLocationText scannen</button>
-      <button class="btn-scan strict" id="btnScanFilteredStrict" onclick="runLocationScan(true, true)">Gefiltert: nur exaktes plantLocationText</button>
+      <button class="btn-scan" id="btnScanAll" onclick="runLocationScan({useFilter:false, strictOnly:false})">Gesamten Datenbestand scannen</button>
+      <button class="btn-scan secondary" id="btnScanFiltered" onclick="runLocationScan({useFilter:true, strictOnly:false})">Nur gefilterte Kategorie scannen</button>
+      <button class="btn-scan" id="btnScanStrictAll" onclick="runLocationScan({useFilter:false, strictOnly:true})">Nur exaktes plantLocationText scannen</button>
+      <button class="btn-scan secondary" id="btnScanStrictFiltered" onclick="runLocationScan({useFilter:true, strictOnly:true})">Gefiltert: nur exaktes plantLocationText</button>
       <button class="btn-scan ghost" id="btnScanStop" onclick="stopLocationScan()" disabled>Stop</button>
     </div>
     <div class="scan-status" id="scanStatus">Noch keine Analyse gestartet.</div>
     <div class="scan-results" id="scanResults"></div>
+    <div class="scan-list-wrap">
+      <div class="scan-list-head">
+        <h3>Trefferliste</h3>
+        <div class="scan-list-note" id="scanListNote">Noch keine Liste vorhanden.</div>
+      </div>
+      <div id="scanListOutput" class="table-wrap"></div>
+    </div>
+    <div class="map-wrap">
+      <div class="map-head">
+        <h3>Karte</h3>
+        <div class="map-note" id="mapNote">Die Karte wird nach einem Scan mit Treffern aktualisiert.</div>
+      </div>
+      <div id="locationMap"></div>
+    </div>
   </div>
 
   <!-- Bauteilkatalog -->
@@ -389,18 +391,6 @@ td input:focus { outline: none; border-color: var(--accent); background: white; 
         </div>
         <div class="chart-wrap"><canvas id="chartSpec"></canvas></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Karte der strengen plantLocationText-Treffer -->
-  <div class="panel">
-    <div class="panel-header">
-      <span>Karte · exaktes plantLocationText</span>
-      <span style="font-weight:400;font-size:10px">Leaflet-Karte für alle strengen Treffer aus der Standortanalyse</span>
-    </div>
-    <div class="map-panel-body">
-      <div id="strictLocationMap"></div>
-      <div class="map-note" id="strictLocationMapNote">Noch keine strengen Treffer vorhanden. Führe zuerst einen strengen Scan aus.</div>
     </div>
   </div>
 
@@ -814,6 +804,17 @@ function getName(obj){if(!obj)return'';if(typeof obj==='string')return obj;const
    LOCATION SCAN HELPERS
    ====================================================== */
 let locationScanToken = 0;
+let locationMap = null;
+let locationMapLayer = null;
+let lastScanRows = [];
+
+const LOCATION_COORDS = {
+  DE:[51.1657,10.4515], AT:[47.5162,14.5501], CH:[46.8182,8.2275], EU:[54.5260,15.2551],
+  GLO:[20,0], GLOBAL:[20,0], WORLD:[20,0], FR:[46.2276,2.2137], IT:[41.8719,12.5674],
+  NL:[52.1326,5.2913], BE:[50.5039,4.4699], DK:[56.2639,9.5018], SE:[60.1282,18.6435],
+  NO:[60.4720,8.4689], FI:[61.9241,25.7482], ES:[40.4637,-3.7492], PT:[39.3999,-8.2245],
+  PL:[51.9194,19.1451], CZ:[49.8175,15.4730], SK:[48.6690,19.6990], HU:[47.1625,19.5033]
+};
 
 function normText(v){return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function getClassPath(p){
@@ -824,12 +825,10 @@ function getClassPath(p){
     .join(' › ');
 }
 function setScanButtons(running){
-  document.getElementById('btnScanAll').disabled = running;
-  document.getElementById('btnScanFiltered').disabled = running;
-  const btnAllStrict = document.getElementById('btnScanAllStrict');
-  const btnFilteredStrict = document.getElementById('btnScanFilteredStrict');
-  if(btnAllStrict) btnAllStrict.disabled = running;
-  if(btnFilteredStrict) btnFilteredStrict.disabled = running;
+  ['btnScanAll','btnScanFiltered','btnScanStrictAll','btnScanStrictFiltered'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.disabled = running;
+  });
   document.getElementById('btnScanStop').disabled = !running;
 }
 function stopLocationScan(){
@@ -837,232 +836,273 @@ function stopLocationScan(){
   setScanButtons(false);
   document.getElementById('scanStatus').innerHTML = '<span style="color:var(--amber)">Analyse gestoppt.</span>';
 }
+function escapeHtml(s){ return esc(s); }
+
 function renderScanResults(stats){
   const pct = stats.total ? ((stats.withLocation / stats.total) * 100).toFixed(1) : '0.0';
-  const examples = stats.examples.length
-    ? '<ul>' + stats.examples.map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)} → <strong>${esc(x.location)}</strong>${x.path ? ` <span style="color:var(--muted)">(<code>${esc(x.path)}</code>)</span>` : ''}</li>`).join('') + '</ul>'
-    : '<div style="color:var(--muted)">Keine Beispieltreffer gefunden.</div>' ;
-
-  let strictListHtml = '';
-  if(stats.strictOnly){
-    const rows = (stats.strictMatches||[]).map(x => `
-      <tr>
-        <td><code>${esc(x.uuid)}</code></td>
-        <td>${esc(x.name)}</td>
-        <td><strong>${esc(x.location)}</strong></td>
-        <td><code>${esc(x.path || 'plantLocationText')}</code></td>
-      </tr>`).join('');
-    strictListHtml = `
-      <div class="strict-list-wrap">
-        <div class="strict-list-head">Liste aller Datensätze mit exaktem plantLocationText</div>
-        ${rows ? `<div class="table-wrap"><table class="table-compact"><thead><tr><th>UUID</th><th>Datensatz</th><th>plantLocationText</th><th>JSON-Pfad</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="strict-empty">Keine exakten plantLocationText-Treffer.</div>`}
-      </div>`;
-  }
-
+  const examples = stats.rows.length
+    ? '<ul>' + stats.rows.slice(0, 12).map(x => `<li><code>${escapeHtml(x.uuid.slice(0,8))}…</code> ${escapeHtml(x.name)} → <strong>${escapeHtml(x.location)}</strong> <span class="scan-pill">${escapeHtml(x.modeLabel)}</span>${x.path ? ` <span style="color:var(--muted)">(${escapeHtml(x.path)})</span>` : ''}</li>`).join('') + '</ul>'
+    : '<div style="color:var(--muted)">Keine Treffer gefunden.</div>';
   document.getElementById('scanResults').innerHTML = `
     <div class="scan-grid">
       <div class="scan-card"><div class="lbl">Geprüfte Datensätze</div><div class="val">${f(stats.checked,0)}</div></div>
-      <div class="scan-card"><div class="lbl">Mit Plant Location</div><div class="val">${f(stats.withLocation,0)}</div></div>
-      <div class="scan-card"><div class="lbl">Ohne Plant Location</div><div class="val">${f(Math.max(0, stats.checked - stats.withLocation),0)}</div></div>
+      <div class="scan-card"><div class="lbl">Mit Standort</div><div class="val">${f(stats.withLocation,0)}</div></div>
+      <div class="scan-card"><div class="lbl">Ohne Standort</div><div class="val">${f(Math.max(0, stats.checked - stats.withLocation),0)}</div></div>
       <div class="scan-card"><div class="lbl">Anteil</div><div class="val">${pct}%</div></div>
     </div>
     <div class="scan-examples">
-      <div><strong>Scope:</strong> ${esc(stats.scope)}</div>
-      <div><strong>Modus:</strong> ${esc(stats.modeText || (stats.strictOnly ? 'Strict: nur exaktes plantLocationText' : 'Heuristik'))}</div>
-      <div><strong>Hinweis:</strong> ${stats.strictOnly ? 'Gezählt werden nur Felder mit exakt passendem Key <code>plantLocationText</code>.' : 'Gesucht wird primär nach <code>plantLocationText</code> und eng verwandten Location-Feldern im Extended-JSON.'}</div>
+      <div><strong>Scope:</strong> ${escapeHtml(stats.scope)}</div>
+      <div><strong>Modus:</strong> ${escapeHtml(stats.modeLabel)}</div>
+      <div><strong>Hinweis:</strong> ${stats.strictOnly
+        ? 'Es werden nur exakte Treffer auf <code>plantLocationText</code> gezählt, inklusive name/value-Varianten mit exakt diesem Feldnamen.'
+        : 'Es werden <code>plantLocationText</code> und eng verwandte Standortfelder im Extended-JSON berücksichtigt.'}
+      </div>
       <div style="margin-top:8px"><strong>Beispiele mit Treffer:</strong>${examples}</div>
-    </div>
-    ${strictListHtml}`;
+    </div>`;
   document.getElementById('scanResults').classList.add('visible');
-  renderStrictLocationMap(stats.strictOnly ? (stats.strictMatches || []) : []);
 }
 
-function extractPlantLocationInfo(ds){
-  const exact = extractExactPlantLocationText(ds);
-  if(exact) return exact;
-  const fallback = extractPlantLocation(ds);
-  return fallback ? { value: fallback, path: 'heuristic match' } : null;
-}
-
-function extractExactPlantLocationText(ds){
-  const seen = new WeakSet();
-  let found = null;
-  const clean = v => {
-    const s = String(v ?? '').replace(/\s+/g,' ').trim();
-    if(!s || /^https?:/i.test(s) || /^[0-9.\-]+$/.test(s)) return '';
-    return s;
-  };
-  function walk(node, path=''){
-    if(found || !node || typeof node !== 'object') return;
-    if(seen.has(node)) return;
-    seen.add(node);
-    if(Array.isArray(node)){
-      for(let i=0;i<node.length;i++){
-        walk(node[i], path ? `${path}[${i}]` : `[${i}]`);
-        if(found) return;
-      }
-      return;
-    }
-    for(const [k,v] of Object.entries(node)){
-      const nextPath = path ? `${path}.${k}` : k;
-      if(k === 'plantLocationText'){
-        if(typeof v === 'string'){
-          const s = clean(v);
-          if(s){ found = { value: s, path: nextPath }; return; }
-        } else if(Array.isArray(v)){
-          for(let i=0;i<v.length;i++){
-            const item = v[i];
-            if(typeof item === 'string'){
-              const s = clean(item);
-              if(s){ found = { value: s, path: `${nextPath}[${i}]` }; return; }
-            } else if(item && typeof item === 'object'){
-              const cand = clean(item.value ?? item['#text'] ?? item.name ?? '');
-              if(cand){ found = { value: cand, path: `${nextPath}[${i}]` }; return; }
-            }
-          }
-        } else if(v && typeof v === 'object'){
-          const cand = clean(v.value ?? v['#text'] ?? v.name ?? '');
-          if(cand){ found = { value: cand, path: nextPath }; return; }
-        }
-      }
-      if(v && typeof v === 'object') walk(v, nextPath);
-      if(found) return;
-    }
+function renderScanList(rows, stats){
+  const note = document.getElementById('scanListNote');
+  const output = document.getElementById('scanListOutput');
+  if(!rows.length){
+    note.textContent = 'Keine Trefferliste vorhanden.';
+    output.innerHTML = '<div class="modal-status">Keine Einträge mit Standort gefunden.</div>';
+    return;
   }
-  walk(ds);
-  return found;
+  note.textContent = `${rows.length} Einträge gelistet · ${stats.modeLabel} · ${stats.scope}`;
+  output.innerHTML = `
+    <div class="scan-table-wrap">
+      <table class="scan-table">
+        <thead>
+          <tr>
+            <th style="width:140px">UUID</th>
+            <th>Datensatz</th>
+            <th style="width:120px">Standort</th>
+            <th style="width:260px">Fundstelle</th>
+            <th style="width:140px">Kategorie</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td><code>${escapeHtml(row.uuid)}</code></td>
+              <td><strong>${escapeHtml(row.name)}</strong></td>
+              <td>${escapeHtml(row.location)}</td>
+              <td><code>${escapeHtml(row.path || '—')}</code></td>
+              <td>${row.classPath ? `<span class="scan-pill">${escapeHtml(row.classPath)}</span>` : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
-let strictMap = null;
-let strictMapLayer = null;
-
-function getLocationLatLng(raw){
-  const s = String(raw || '').trim();
-  if(!s) return null;
-  const key = s.toUpperCase();
-  const map = {
-    'DE':[51.1657,10.4515], 'DEUTSCHLAND':[51.1657,10.4515], 'GERMANY':[51.1657,10.4515],
-    'AT':[47.5162,14.5501], 'ÖSTERREICH':[47.5162,14.5501], 'AUSTRIA':[47.5162,14.5501],
-    'CH':[46.8182,8.2275], 'SCHWEIZ':[46.8182,8.2275], 'SWITZERLAND':[46.8182,8.2275],
-    'EU':[54.5260,15.2551], 'EUROPA':[54.5260,15.2551], 'EUROPE':[54.5260,15.2551],
-    'FR':[46.2276,2.2137], 'FRANKREICH':[46.2276,2.2137], 'FRANCE':[46.2276,2.2137],
-    'IT':[41.8719,12.5674], 'ITALIEN':[41.8719,12.5674], 'ITALY':[41.8719,12.5674],
-    'BE':[50.5039,4.4699], 'BELGIEN':[50.5039,4.4699], 'BELGIUM':[50.5039,4.4699],
-    'NL':[52.1326,5.2913], 'NIEDERLANDE':[52.1326,5.2913], 'NETHERLANDS':[52.1326,5.2913],
-    'DK':[56.2639,9.5018], 'DÄNEMARK':[56.2639,9.5018], 'DENMARK':[56.2639,9.5018],
-    'SE':[60.1282,18.6435], 'SCHWEDEN':[60.1282,18.6435], 'SWEDEN':[60.1282,18.6435],
-    'NO':[60.4720,8.4689], 'NORWEGEN':[60.4720,8.4689], 'NORWAY':[60.4720,8.4689],
-    'FI':[61.9241,25.7482], 'FINNLAND':[61.9241,25.7482], 'FINLAND':[61.9241,25.7482],
-    'PL':[51.9194,19.1451], 'POLEN':[51.9194,19.1451], 'POLAND':[51.9194,19.1451],
-    'CZ':[49.8175,15.4730], 'TSCHECHIEN':[49.8175,15.4730], 'CZECH REPUBLIC':[49.8175,15.4730],
-    'ES':[40.4637,-3.7492], 'SPANIEN':[40.4637,-3.7492], 'SPAIN':[40.4637,-3.7492],
-    'PT':[39.3999,-8.2245], 'PORTUGAL':[39.3999,-8.2245],
-    'UK':[55.3781,-3.4360], 'GB':[55.3781,-3.4360], 'UNITED KINGDOM':[55.3781,-3.4360],
-    'GLO':[20,0], 'GLOBAL':[20,0], 'WORLD':[20,0]
-  };
-  if(map[key]) return map[key];
-  const cc = s.match(/([A-Z]{2})/);
-  if(cc && map[cc[1]]) return map[cc[1]];
-  const parts = s.split(/[;,/]|\s-\s/).map(x=>x.trim()).filter(Boolean);
-  for(const part of parts){
-    const pk = part.toUpperCase();
-    if(map[pk]) return map[pk];
-  }
-  return null;
-}
-
-function renderStrictLocationMap(entries){
-  const noteEl = document.getElementById('strictLocationMapNote');
-  const mapEl = document.getElementById('strictLocationMap');
-  if(!mapEl || typeof L === 'undefined') return;
-  if(!strictMap){
-    strictMap = L.map('strictLocationMap');
+function ensureMap(){
+  if(typeof L === 'undefined') return null;
+  if(!locationMap){
+    locationMap = L.map('locationMap', { scrollWheelZoom: true }).setView([51.1657, 10.4515], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '&copy; OpenStreetMap'
-    }).addTo(strictMap);
-    strictMap.setView([51.2, 10.4], 4);
+    }).addTo(locationMap);
+    locationMapLayer = L.layerGroup().addTo(locationMap);
   }
-  if(strictMapLayer){
-    strictMap.removeLayer(strictMapLayer);
-    strictMapLayer = null;
-  }
-  const groups = new Map();
-  for(const entry of entries || []){
-    const coords = getLocationLatLng(entry.location);
-    if(!coords) continue;
-    const key = `${coords[0].toFixed(4)},${coords[1].toFixed(4)}|${entry.location}`;
-    if(!groups.has(key)) groups.set(key, { coords, location: entry.location, items: [] });
-    groups.get(key).items.push(entry);
-  }
-  const vals = Array.from(groups.values());
-  if(!vals.length){
-    noteEl.textContent = entries && entries.length ? 'Für die strengen Treffer wurden plantLocationText-Werte gefunden, aber derzeit nur bekannte Länder-/Regionscodes auf der Karte verortet.' : 'Noch keine strengen Treffer vorhanden. Führe zuerst einen strengen Scan aus.';
-    strictMap.setView([51.2, 10.4], 4);
-    setTimeout(() => strictMap.invalidateSize(), 0);
+  setTimeout(()=>locationMap.invalidateSize(), 50);
+  return locationMap;
+}
+function resolveLocationCoords(raw){
+  const value = String(raw||'').trim();
+  if(!value) return null;
+  const upper = value.toUpperCase();
+  if(LOCATION_COORDS[upper]) return LOCATION_COORDS[upper];
+  const part = upper.split(/[,/;|]/).map(x=>x.trim()).find(Boolean);
+  if(part && LOCATION_COORDS[part]) return LOCATION_COORDS[part];
+  const match = upper.match(/\b(DE|AT|CH|EU|FR|IT|NL|BE|DK|SE|NO|FI|ES|PT|PL|CZ|SK|HU|GLO|GLOBAL|WORLD)\b/);
+  if(match && LOCATION_COORDS[match[1]]) return LOCATION_COORDS[match[1]];
+  return null;
+}
+function renderLocationMap(rows, stats){
+  const map = ensureMap();
+  const note = document.getElementById('mapNote');
+  if(!map || !locationMapLayer){
+    note.textContent = 'Leaflet konnte nicht geladen werden.';
     return;
   }
-  strictMapLayer = L.layerGroup();
-  const bounds = [];
-  for(const group of vals){
-    const marker = L.circleMarker(group.coords, { radius: Math.min(18, 7 + Math.log2(group.items.length + 1) * 3), weight: 2, color: '#0c3d3d', fillColor: '#27ae75', fillOpacity: 0.75 });
-    const list = group.items.slice(0, 20).map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)}</li>`).join('');
-    const more = group.items.length > 20 ? `<div style="margin-top:6px;color:#6b6860;font-size:11px">+ ${group.items.length - 20} weitere</div>` : '';
-    marker.bindPopup(`<div style="min-width:240px"><strong>${esc(group.location)}</strong><div style="margin:4px 0 8px;color:#6b6860">${group.items.length} Datensatz${group.items.length===1?'':'e'}</div><ul style="margin:0 0 0 18px;padding:0">${list}</ul>${more}</div>`);
-    marker.addTo(strictMapLayer);
-    bounds.push(group.coords);
+  locationMapLayer.clearLayers();
+  if(!rows.length){
+    note.textContent = 'Keine Treffer für die Karte vorhanden.';
+    map.setView([51.1657, 10.4515], 4);
+    return;
   }
-  strictMapLayer.addTo(strictMap);
-  if(bounds.length === 1) strictMap.setView(bounds[0], 5);
-  else strictMap.fitBounds(bounds, { padding:[24,24] });
-  noteEl.textContent = `${entries.length} strenge Treffer, davon ${vals.reduce((a,x)=>a+x.items.length,0)} in der Karte verortet. Mehrfachtreffer pro Ort werden aggregiert.`;
-  setTimeout(() => strictMap.invalidateSize(), 0);
+  const groups = new Map();
+  for(const row of rows){
+    const coords = resolveLocationCoords(row.location);
+    if(!coords) continue;
+    const key = `${coords[0]},${coords[1]}|${row.location}`;
+    if(!groups.has(key)) groups.set(key, { coords, label: row.location, rows: [] });
+    groups.get(key).rows.push(row);
+  }
+  const markers = [];
+  for(const group of groups.values()){
+    const popup = `
+      <div style="min-width:240px">
+        <div style="font-weight:700;margin-bottom:6px">${escapeHtml(group.label)}</div>
+        <div style="font-size:11px;color:#666;margin-bottom:8px">${group.rows.length} Datensatz${group.rows.length===1?'':'e'}</div>
+        <ul style="padding-left:18px;margin:0">
+          ${group.rows.slice(0,12).map(r=>`<li><strong>${escapeHtml(r.name)}</strong><br><span style="color:#666"><code>${escapeHtml(r.uuid.slice(0,8))}…</code>${r.path ? ` · ${escapeHtml(r.path)}` : ''}</span></li>`).join('')}
+        </ul>
+        ${group.rows.length > 12 ? `<div style="margin-top:8px;color:#666">… und ${group.rows.length - 12} weitere</div>` : ''}
+      </div>`;
+    const marker = L.marker(group.coords).bindPopup(popup);
+    marker.addTo(locationMapLayer);
+    markers.push(marker);
+  }
+  if(!markers.length){
+    note.textContent = 'Treffer vorhanden, aber die Standortwerte lassen sich noch nicht auf Koordinaten abbilden.';
+    map.setView([51.1657, 10.4515], 4);
+    return;
+  }
+  const fg = L.featureGroup(markers);
+  map.fitBounds(fg.getBounds().pad(0.25));
+  note.textContent = `${markers.length} Marker aus ${rows.length} Treffern · ${stats.modeLabel}`;
 }
 
-function extractPlantLocation(ds){
+function extractPlantLocationInfo(ds){
   const seen = new WeakSet();
   const hits = [];
   const keyRxPrimary = /(plant.?location.?text|locationofproduction|productionsite|plantsite|factorylocation|manufacturinglocation)/i;
   const keyRxSecondary = /(plant|production|manufactur|factory|site|geograph|location)/i;
-  const strOk = v => {
-    const s = String(v||'').replace(/\s+/g,' ').trim();
+
+  function cleanValue(v){
+    const s = String(v ?? '').replace(/\s+/g,' ').trim();
     if(!s || s.length < 2) return '';
     if(/^https?:/i.test(s)) return '';
     if(/^[0-9.\-]+$/.test(s)) return '';
     return s;
-  };
+  }
+
+  function addHit(path, value, score){
+    const cleaned = cleanValue(value);
+    if(cleaned) hits.push({ path, value: cleaned, score });
+  }
+
   function walk(node, path=''){
-    if(!node || typeof node !== 'object') return;
+    if(node === null || node === undefined) return;
+    if(typeof node !== 'object') return;
     if(seen.has(node)) return;
     seen.add(node);
+
     if(Array.isArray(node)){
-      for(const item of node) walk(item, path);
+      node.forEach((item, idx) => walk(item, `${path}[${idx}]`));
       return;
     }
-    for(const [k,v] of Object.entries(node)){
-      const nextPath = path ? path + '.' + k : k;
-      if(typeof v === 'string'){
-        const sv = strOk(v);
-        if(sv && (keyRxPrimary.test(k) || (keyRxPrimary.test(nextPath)) || (keyRxSecondary.test(k) && /[A-Za-zÄÖÜäöü]/.test(sv)))){
-          hits.push({path: nextPath, value: sv, score: keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) ? 4 : 1});
-        }
-      } else if(Array.isArray(v)){
-        for(const item of v){
-          if(item && typeof item === 'object') walk(item, nextPath);
-          else if(typeof item === 'string'){
-            const sv = strOk(item);
-            if(sv && keyRxPrimary.test(nextPath)) hits.push({path: nextPath, value: sv, score: 3});
+
+    for(const [key, value] of Object.entries(node)){
+      const nextPath = path ? `${path}.${key}` : key;
+
+      if(key === 'plantLocationText'){
+        addHit(nextPath, value, 10);
+      }
+
+      if((key === 'name' || key === '@name') && String(value).trim() === 'plantLocationText'){
+        addHit(`${nextPath}=plantLocationText`, node.value ?? node['#text'] ?? node.text ?? '', 10);
+      }
+
+      if(typeof value === 'string'){
+        if(keyRxPrimary.test(key) || keyRxPrimary.test(nextPath)) addHit(nextPath, value, 8);
+        else if(keyRxSecondary.test(key) || keyRxSecondary.test(nextPath)) addHit(nextPath, value, 2);
+      } else if(Array.isArray(value)) {
+        value.forEach((item, idx) => {
+          if(item && typeof item === 'object'){
+            const n = item.name ?? item['@name'] ?? '';
+            if(String(n).trim() === 'plantLocationText'){
+              addHit(`${nextPath}[${idx}].name=plantLocationText`, item.value ?? item['#text'] ?? item.text ?? '', 10);
+            }
+            walk(item, `${nextPath}[${idx}]`);
+          } else if(typeof item === 'string' && keyRxPrimary.test(nextPath)){
+            addHit(nextPath, item, 6);
           }
+        });
+      } else if(value && typeof value === 'object'){
+        const nestedName = value.name ?? value['@name'] ?? '';
+        if(String(nestedName).trim() === 'plantLocationText'){
+          addHit(`${nextPath}.name=plantLocationText`, value.value ?? value['#text'] ?? value.text ?? '', 10);
         }
-      } else if(v && typeof v === 'object') {
-        walk(v, nextPath);
+        walk(value, nextPath);
       }
     }
   }
+
   walk(ds);
-  if(!hits.length) return '';
+  if(!hits.length) return null;
   hits.sort((a,b)=> b.score - a.score || a.value.length - b.value.length);
-  return hits[0].value;
+  return hits[0];
+}
+function extractStrictPlantLocationInfo(ds){
+  const seen = new WeakSet();
+  const hits = [];
+
+  function normalizeVal(value){
+    if(value === null || value === undefined) return '';
+    if(typeof value === 'string') return value.trim();
+    if(typeof value === 'number') return String(value);
+    if(Array.isArray(value)){
+      return value.map(v => normalizeVal(v)).filter(Boolean).join(' | ');
+    }
+    if(typeof value === 'object'){
+      if(typeof value.value === 'string') return value.value.trim();
+      if(typeof value['#text'] === 'string') return value['#text'].trim();
+      if(typeof value.text === 'string') return value.text.trim();
+      if(Array.isArray(value.value)) return value.value.map(v => normalizeVal(v)).filter(Boolean).join(' | ');
+      if(Array.isArray(value['#text'])) return value['#text'].map(v => normalizeVal(v)).filter(Boolean).join(' | ');
+    }
+    return '';
+  }
+
+  function pushResult(value, path){
+    const cleaned = normalizeVal(value);
+    if(cleaned) hits.push({ value: cleaned, path, score: 10 });
+  }
+
+  function walk(node, path=''){
+    if(node === null || node === undefined) return;
+    if(typeof node !== 'object') return;
+    if(seen.has(node)) return;
+    seen.add(node);
+
+    if(Array.isArray(node)){
+      node.forEach((item, idx) => walk(item, `${path}[${idx}]`));
+      return;
+    }
+
+    for(const [key, value] of Object.entries(node)){
+      const nextPath = path ? `${path}.${key}` : key;
+
+      if(key === 'plantLocationText'){
+        pushResult(value, nextPath);
+      }
+
+      if((key === 'name' || key === '@name') && String(value).trim() === 'plantLocationText'){
+        const siblingValue = node.value ?? node['#text'] ?? node.text ?? '';
+        pushResult(siblingValue, `${nextPath}=plantLocationText`);
+      }
+
+      if(value && typeof value === 'object'){
+        const nestedName = value.name ?? value['@name'] ?? '';
+        if(String(nestedName).trim() === 'plantLocationText'){
+          const nestedValue = value.value ?? value['#text'] ?? value.text ?? '';
+          pushResult(nestedValue, `${nextPath}.name=plantLocationText`);
+        }
+      }
+
+      walk(value, nextPath);
+    }
+  }
+
+  walk(ds, '');
+  if(!hits.length) return null;
+  hits.sort((a,b)=> b.score - a.score);
+  return hits[0];
 }
 async function fetchProcessSummaries(ds){
   const pageSizes = [10000, 5000, 2500];
@@ -1076,20 +1116,28 @@ async function fetchProcessSummaries(ds){
   }
   throw lastErr || new Error('Prozessliste konnte nicht geladen werden.');
 }
-async function runLocationScan(useFilter, strictOnly=false){
+async function runLocationScan(options = {}){
+  const useFilter = !!options.useFilter;
+  const strictOnly = !!options.strictOnly;
   const myToken = ++locationScanToken;
   const ds = document.getElementById('dsSelect').value;
   const filterRaw = document.getElementById('scanFilter').value.trim();
   const filter = normText(filterRaw);
   const status = document.getElementById('scanStatus');
   const results = document.getElementById('scanResults');
+  const modeLabel = strictOnly ? 'Strict: nur exaktes plantLocationText' : 'Heuristik: plantLocationText + verwandte Standortfelder';
+
   results.classList.remove('visible');
   results.innerHTML = '';
+  document.getElementById('scanListOutput').innerHTML = '<div class="modal-status">Scan läuft…</div>';
+  document.getElementById('scanListNote').textContent = 'Trefferliste wird aufgebaut…';
   setScanButtons(true);
   status.innerHTML = 'Lade Prozessliste…';
+
   try {
     const summary = await fetchProcessSummaries(ds);
     if(myToken !== locationScanToken) return;
+
     let items = summary.items;
     if(useFilter){
       if(!filter){
@@ -1102,17 +1150,21 @@ async function runLocationScan(useFilter, strictOnly=false){
         return hay.includes(filter);
       });
     }
+
     const totalListed = summary.totalCount || summary.items.length;
     const scope = useFilter ? `Filter „${filterRaw}“` : 'Gesamter Datenbestand';
-    const modeText = strictOnly ? 'Strict: nur exaktes plantLocationText' : 'Heuristik';
     if(!items.length){
       setScanButtons(false);
-      status.innerHTML = `<span style="color:var(--amber)">Keine Datensätze für ${esc(scope)} gefunden.</span>`;
+      status.innerHTML = `<span style="color:var(--amber)">Keine Datensätze für ${escapeHtml(scope)} gefunden.</span>`;
+      renderScanList([], {modeLabel, scope});
+      renderLocationMap([], {modeLabel});
       return;
     }
+
     status.innerHTML = `Prüfe ${f(items.length,0)} Datensätze (${scope})…`;
-    const stats = { total: items.length, checked: 0, withLocation: 0, examples: [], strictMatches: [], scope, strictOnly, modeText };
+    const stats = { total: items.length, checked: 0, withLocation: 0, rows: [], scope, strictOnly, modeLabel };
     const chunkSize = 8;
+
     for(let i=0;i<items.length;i+=chunkSize){
       if(myToken !== locationScanToken) return;
       const chunk = items.slice(i, i + chunkSize);
@@ -1120,43 +1172,54 @@ async function runLocationScan(useFilter, strictOnly=false){
         try {
           const version = p.version ? `version=${encodeURIComponent(p.version)}&` : '';
           const dsj = await apiFetch(`${BASE}/datastocks/${ds}/processes/${p.uuid}?${version}format=JSON&view=extended`);
-          const hit = strictOnly ? extractExactPlantLocationText(dsj) : extractPlantLocationInfo(dsj);
+          const hit = strictOnly ? extractStrictPlantLocationInfo(dsj) : extractPlantLocationInfo(dsj);
           return { ok:true, p, hit };
         } catch (e) {
           return { ok:false, p, error:e };
         }
       });
       const rows = await Promise.all(promises);
+
       for(const row of rows){
         stats.checked += 1;
         if(row.ok && row.hit && row.hit.value){
           stats.withLocation += 1;
-          const entry = { uuid: row.p.uuid, name: getName(row.p) || row.p.uuid, location: row.hit.value, path: row.hit.path || '' };
-          if(stats.examples.length < 12) stats.examples.push(entry);
-          if(strictOnly) stats.strictMatches.push(entry);
+          stats.rows.push({
+            uuid: row.p.uuid,
+            name: getName(row.p) || row.p.uuid,
+            location: row.hit.value,
+            path: row.hit.path || '',
+            classPath: getClassPath(row.p),
+            modeLabel
+          });
         }
       }
-      if(strictOnly){
-        stats.strictMatches.sort((a,b) => a.name.localeCompare(b.name, 'de'));
-      }
+
       const pct = stats.checked ? ((stats.withLocation / stats.checked) * 100).toFixed(1) : '0.0';
       status.innerHTML = `Prüfe ${f(stats.checked,0)} / ${f(stats.total,0)} Datensätze… &nbsp; Treffer: <strong>${f(stats.withLocation,0)}</strong> (${pct}%)`;
       renderScanResults(stats);
+      renderScanList(stats.rows, stats);
+      renderLocationMap(stats.rows, stats);
       await new Promise(r=>setTimeout(r, 0));
     }
+
+    stats.rows.sort((a,b) => a.location.localeCompare(b.location,'de') || a.name.localeCompare(b.name,'de'));
+    lastScanRows = stats.rows.slice();
+
     setScanButtons(false);
     let note = '';
     if(!useFilter && totalListed > summary.items.length){
       note = ` <span style="color:var(--amber)">Hinweis: API meldet insgesamt ${f(totalListed,0)} Datensätze, geladen wurden aber ${f(summary.items.length,0)}. Dann begrenzt die List-API vermutlich die Seite.</span>`;
     }
-    status.innerHTML = `<span style="color:var(--green)">Analyse abgeschlossen.</span> ${f(stats.withLocation,0)} von ${f(stats.checked,0)} Datensätzen haben ${strictOnly ? 'ein exaktes <code>plantLocationText</code>' : 'eine erkannte Plant Location'}.${note}`;
+    status.innerHTML = `<span style="color:var(--green)">Analyse abgeschlossen.</span> ${f(stats.withLocation,0)} von ${f(stats.checked,0)} Datensätzen haben einen gefundenen Standort.${note}`;
     renderScanResults(stats);
+    renderScanList(stats.rows, stats);
+    renderLocationMap(stats.rows, stats);
   } catch (e) {
     setScanButtons(false);
-    status.innerHTML = `<span style="color:var(--red)">Fehler bei der Standortanalyse: ${esc(e.message)}</span>`;
+    status.innerHTML = `<span style="color:var(--red)">Fehler bei der Standortanalyse: ${escapeHtml(e.message)}</span>`;
   }
 }
-
 /* ======================================================
    INIT
    ====================================================== */
