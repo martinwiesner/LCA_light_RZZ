@@ -790,7 +790,7 @@ function stopLocationScan(){
 function renderScanResults(stats){
   const pct = stats.total ? ((stats.withLocation / stats.total) * 100).toFixed(1) : '0.0';
   const examples = stats.examples.length
-    ? '<ul>' + stats.examples.map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)} → <strong>${esc(x.location)}</strong></li>`).join('') + '</ul>'
+    ? '<ul>' + stats.examples.map(x => `<li><code>${esc(x.uuid.slice(0,8))}…</code> ${esc(x.name)} → <strong>${esc(x.location)}</strong>${x.path ? ` <span style="color:var(--muted)">(${esc(x.path)})</span>` : ''}</li>`).join('') + '</ul>'
     : '<div style="color:var(--muted)">Keine Beispieltreffer gefunden.</div>';
   document.getElementById('scanResults').innerHTML = `
     <div class="scan-grid">
@@ -806,7 +806,7 @@ function renderScanResults(stats){
     </div>`;
   document.getElementById('scanResults').classList.add('visible');
 }
-function extractPlantLocation(ds){
+function extractPlantLocationInfo(ds){
   const seen = new WeakSet();
   const hits = [];
   const keyRxPrimary = /(plant.?location.?text|locationofproduction|productionsite|plantsite|factorylocation|manufacturinglocation)/i;
@@ -830,7 +830,7 @@ function extractPlantLocation(ds){
       const nextPath = path ? path + '.' + k : k;
       if(typeof v === 'string'){
         const sv = strOk(v);
-        if(sv && (keyRxPrimary.test(k) || (keyRxPrimary.test(nextPath)) || (keyRxSecondary.test(k) && /[A-Za-zÄÖÜäöü]/.test(sv)))){
+        if(sv && (keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) || (keyRxSecondary.test(k) && /[A-Za-zÄÖÜäöü]/.test(sv)))){
           hits.push({path: nextPath, value: sv, score: keyRxPrimary.test(k) || keyRxPrimary.test(nextPath) ? 4 : 1});
         }
       } else if(Array.isArray(v)){
@@ -847,9 +847,12 @@ function extractPlantLocation(ds){
     }
   }
   walk(ds);
-  if(!hits.length) return '';
+  if(!hits.length) return null;
   hits.sort((a,b)=> b.score - a.score || a.value.length - b.value.length);
-  return hits[0].value;
+  return hits[0];
+}
+function extractPlantLocation(ds){
+  return extractPlantLocationInfo(ds)?.value || '';
 }
 async function fetchProcessSummaries(ds){
   const pageSizes = [10000, 5000, 2500];
